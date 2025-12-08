@@ -13,6 +13,11 @@ class Store(BaseModel):
     accepted_programs: List[str] = Field(..., description="List of accepted aid program IDs")
     distance: Optional[float] = Field(None, description="Distance from user location in kilometers")
     
+    @property
+    def distance_km(self) -> Optional[float]:
+        """Alias for distance (for frontend compatibility)"""
+        return self.distance
+    
     model_config = {
         "json_schema_extra": {
             "example": {

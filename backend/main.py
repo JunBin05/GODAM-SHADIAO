@@ -43,7 +43,7 @@ async def health_check():
     }
 
 # Router registration
-from backend.routes import auth, aid, store, payment, reminder, str_application
+from routes import auth, aid, store, payment, reminder, str_application
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(aid.router, prefix="/api/aid", tags=["Aid Programs"])
 app.include_router(store.router, prefix="/api/stores", tags=["Store Locator"])

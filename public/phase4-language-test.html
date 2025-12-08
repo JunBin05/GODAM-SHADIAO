@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phase 4: Multi-Language API Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5rem;
+    }
+    .language-selector {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 30px;
+    }
+    .lang-btn {
+      padding: 12px 30px;
+      border: 2px solid white;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    .lang-btn:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-2px);
+    }
+    .lang-btn.active {
+      background: white;
+      color: #667eea;
+    }
+    .test-section {
+      background: white;
+      border-radius: 20px;
+      padding: 25px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+    .test-section h2 {
+      color: #667eea;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .test-btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      transition: all 0.3s;
+      margin-right: 10px;
+    }
+    .test-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    .result {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+    }
+    .result.success {
+      border-left-color: #10b981;
+      background: #ecfdf5;
+    }
+    .result.error {
+      border-left-color: #ef4444;
+      background: #fee2e2;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .summary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 15px;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .summary h3 {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌐 Phase 4: Multi-Language API Integration Test</h1>
+    
+    <div class="summary">
+      <h3>Testing Language Switching with Backend APIs</h3>
+      <p>Select a language and test if backend returns translations correctly</p>
+    </div>
+
+    <!-- Language Selector -->
+    <div class="language-selector">
+      <button class="lang-btn active" onclick="changeLanguage('en')" id="btn-en">🇬🇧 English</button>
+      <button class="lang-btn" onclick="changeLanguage('ms')" id="btn-ms">🇲🇾 Bahasa</button>
+      <button class="lang-btn" onclick="changeLanguage('zh')" id="btn-zh">🇨🇳 中文</button>
+      <button class="lang-btn" onclick="changeLanguage('ta')" id="btn-ta">🇮🇳 தமிழ்</button>
+    </div>
+
+    <!-- Test 1: STR Application Info -->
+    <div class="test-section">
+      <h2>📋 Test 1: STR Application Info</h2>
+      <p>Tests: <code>GET /api/str-application/application-info?lang={lang}</code></p>
+      <button class="test-btn" onclick="testSTRInfo()">Test STR Info</button>
+      <div id="result-str-info"></div>
+    </div>
+
+    <!-- Test 2: Eligibility Check -->
+    <div class="test-section">
+      <h2>✅ Test 2: Eligibility Check (Multi-Language Error)</h2>
+      <p>Tests: <code>POST /api/aid/check-eligibility/str?lang={lang}</code></p>
+      <button class="test-btn" onclick="testEligibility()">Test Eligibility</button>
+      <div id="result-eligibility"></div>
+    </div>
+
+    <!-- Test 3: STR Validation -->
+    <div class="test-section">
+      <h2>🔍 Test 3: STR Data Validation</h2>
+      <p>Tests: <code>POST /api/str-application/validate-data?lang={lang}</code></p>
+      <button class="test-btn" onclick="testValidation()">Test Validation</button>
+      <div id="result-validation"></div>
+    </div>
+
+    <!-- Test 4: Prepare Application -->
+    <div class="test-section">
+      <h2>🚀 Test 4: Prepare STR Application (Full Flow)</h2>
+      <p>Tests: <code>POST /api/str-application/prepare-application?lang={lang}</code></p>
+      <button class="test-btn" onclick="testPrepareApp()">Test Full Application</button>
+      <div id="result-prepare"></div>
+    </div>
+
+    <!-- Test 5: Store Locator -->
+    <div class="test-section">
+      <h2>📍 Test 5: Store Locator (Translations)</h2>
+      <p>Tests: <code>GET /api/stores/nearby?lang={lang}</code></p>
+      <button class="test-btn" onclick="testStores()">Test Stores</button>
+      <div id="result-stores"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentLang = 'en';
+    const API_BASE = 'http://localhost:8000/api';
+
+    function changeLanguage(lang) {
+      currentLang = lang;
+      
+      // Update button styles
+      document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`btn-${lang}`).classList.add('active');
+      
+      console.log(`Language changed to: ${lang}`);
+    }
+
+    async function testSTRInfo() {
+      const resultDiv = document.getElementById('result-str-info');
+      resultDiv.innerHTML = '<p>Testing...</p>';
+      
+      try {
+        const response = await fetch(`${API_BASE}/str-application/application-info?lang=${currentLang}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          resultDiv.innerHTML = `
+            <div class="result success">
+              <span class="status success">✓ SUCCESS</span>
+              <h4>Program: ${data.data.program_name}</h4>
+              <p><strong>Description:</strong> ${data.data.description}</p>
+              <p><strong>Amount Range:</strong> ${data.data.amount_range}</p>
+              <p><strong>Portal:</strong> <a href="${data.data.portal_url}" target="_blank">${data.data.portal_url}</a></p>
+              <details>
+                <summary>View Full Response</summary>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+              </details>
+            </div>
+          `;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error"><span class="status error">✗ ERROR</span><pre>${error.message}</pre></div>`;
+      }
+    }
+
+    async function testEligibility() {
+      const resultDiv = document.getElementById('result-eligibility');
+      resultDiv.innerHTML = '<p>Testing with invalid data to see error messages...</p>';
+      
+      try {
+        const response = await fetch(`${API_BASE}/aid/check-eligibility/str?lang=${currentLang}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            ic: "123", // Invalid - too short
+            age: 25,
+            state: "invalid_state", // Invalid state code
+            household_size: 0, // Invalid - must be > 0
+            monthly_income: -100, // Invalid - negative income
+            employment_status: "unknown" // Invalid employment status
+          })
+        });
+        
+        const data = await response.json();
+        
+        resultDiv.innerHTML = `
+          <div class="result ${data.success ? 'success' : 'error'}">
+            <span class="status ${data.success ? 'success' : 'error'}">${data.success ? '✓ SUCCESS' : '✗ VALIDATION ERRORS'}</span>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          </div>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error"><span class="status error">✗ ERROR</span><pre>${error.message}</pre></div>`;
+      }
+    }
+
+    async function testValidation() {
+      const resultDiv = document.getElementById('result-validation');
+      resultDiv.innerHTML = '<p>Testing validation with missing spouse data...</p>';
+      
+      try {
+        const response = await fetch(`${API_BASE}/str-application/validate-data?lang=${currentLang}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            applicant: {
+              ic_number: "12345", // Invalid - too short (should be 12 digits)
+              name: "Ahmad bin Ali",
+              age: 35,
+              gender: "male",
+              phone_mobile: "0123456789",
+              occupation: "employed", // Fixed: use 'employed' not 'employed_private'
+              household_monthly_income: 3000,
+              marital_status: "married", // Married but no spouse provided
+              address: "123 Jalan Test",
+              postcode: "50000",
+              city: "Kuala Lumpur",
+              state: "WP Kuala Lumpur",
+              bank_name: "Maybank",
+              bank_account: "1234567890",
+              email: "test@example.com"
+            },
+            spouse: null, // Should trigger error for married status
+            children: [],
+            guardian: {
+              relationship: "parent",
+              id_type: "mykad", // Fixed: use 'mykad' not 'ic'
+              id_number: "800101011234",
+              name: "Parent Name",
+              phone_mobile: "0123456789"
+            }
+          })
+        });
+        
+        const data = await response.json();
+        
+        resultDiv.innerHTML = `
+          <div class="result ${data.success ? 'success' : 'error'}">
+            <span class="status ${data.success ? 'success' : 'error'}">${data.success ? '✓ VALID' : '✗ INVALID'}</span>
+            <h4>Validation Errors:</h4>
+            <ul>
+              ${data.errors && data.errors.length > 0 ? data.errors.map(err => `<li><strong>${err.field}:</strong> ${err.message}</li>`).join('') : '<li>No errors</li>'}
+            </ul>
+            <details>
+              <summary>▶ View Full Response</summary>
+              <pre>${JSON.stringify(data, null, 2)}</pre>
+            </details>
+          </div>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error"><span class="status error">✗ ERROR</span><pre>${error.message}</pre></div>`;
+      }
+    }
+
+    async function testPrepareApp() {
+      const resultDiv = document.getElementById('result-prepare');
+      resultDiv.innerHTML = '<p>Testing full application preparation...</p>';
+      
+      try {
+        const response = await fetch(`${API_BASE}/str-application/prepare-application?lang=${currentLang}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            applicant: {
+              ic_number: "800101141234",
+              name: "Ahmad bin Ali",
+              age: 44,
+              gender: "male",
+              phone_mobile: "0123456789",
+              occupation: "employed",
+              household_monthly_income: 2000,
+              marital_status: "married",
+              address: "123 Jalan Test",
+              postcode: "50000",
+              city: "Kuala Lumpur",
+              state: "WP Kuala Lumpur",
+              bank_name: "Maybank",
+              bank_account: "1234567890",
+              email: "ahmad@example.com"
+            },
+            spouse: {
+              id_type: "mykad",
+              id_number: "850505141234",
+              name: "Siti Fatimah",
+              phone_mobile: "0198765432",
+              occupation: "homemaker",
+              bank_name: "CIMB",
+              bank_account: "9876543210"
+            },
+            children: [
+              {id_number: "150101141234", name: "Ahmad Junior", status: "biological"},
+              {id_number: "170202141234", name: "Siti Sarah", status: "biological"}
+            ],
+            guardian: null
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          const result = data.data;
+          resultDiv.innerHTML = `
+            <div class="result success">
+              <span class="status success">✓ SUCCESS</span>
+              <h4>Eligibility: ${result.eligibility_result.eligible ? '✓ ELIGIBLE' : '✗ NOT ELIGIBLE'}</h4>
+              <p><strong>Estimated Amount:</strong> RM ${result.estimated_amount}</p>
+              
+              <h4>Required Documents (${result.required_documents.length}):</h4>
+              <ul>
+                ${result.required_documents.map(doc => `<li>${doc}</li>`).join('')}
+              </ul>
+              
+              <h4>Next Steps (${currentLang.toUpperCase()}):</h4>
+              <ol>
+                ${result.next_steps[currentLang] ? result.next_steps[currentLang].slice(0, 5).map(step => `<li>${step}</li>`).join('') : '<li>No steps available for this language</li>'}
+              </ol>
+              
+              <p><strong>Portal URL:</strong> <a href="${result.portal_url}" target="_blank">${result.portal_url}</a></p>
+              
+              <details>
+                <summary>View Full Response (All Languages)</summary>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+              </details>
+            </div>
+          `;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error"><span class="status error">✗ ERROR</span><pre>${error.message}</pre></div>`;
+      }
+    }
+
+    async function testStores() {
+      const resultDiv = document.getElementById('result-stores');
+      resultDiv.innerHTML = '<p>Testing store locator (Kuala Lumpur area)...</p>';
+      
+      try {
+        const response = await fetch(`${API_BASE}/stores/locate`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            latitude: 3.139,
+            longitude: 101.6869,
+            radius_km: 5
+          })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          const stores = data.data.slice(0, 3); // Show first 3
+          resultDiv.innerHTML = `
+            <div class="result success">
+              <span class="status success">✓ SUCCESS</span>
+              <h4>Found ${data.data.length} stores within 5km</h4>
+              <p><strong>Showing first 3:</strong></p>
+              ${stores.map((store, idx) => `
+                <div style="padding: 10px; background: white; border-radius: 8px; margin: 10px 0;">
+                  <strong>${idx + 1}. ${store.name}</strong><br>
+                  Address: ${store.address}<br>
+                  Distance: ${store.distance_km.toFixed(2)} km
+                </div>
+              `).join('')}
+              <details>
+                <summary>View All ${data.data.length} Stores</summary>
+                <pre>${JSON.stringify(data.data, null, 2)}</pre>
+              </details>
+            </div>
+          `;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="result error"><span class="status error">✗ ERROR</span><pre>${error.message}</pre></div>`;
+      }
+    }
+
+    // Auto-test on page load
+    window.onload = () => {
+      console.log('Phase 4 Multi-Language Test Page Loaded');
+      console.log('Backend should be running at: http://localhost:8000');
+    };
+  </script>
+</body>
+</html>

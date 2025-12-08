@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Query
-from backend.models.reminder import Reminder, ReminderListResponse
-from backend.services.reminder_service import get_user_reminders, get_unread_count, mark_reminder_as_read
+from models.reminder import Reminder, ReminderListResponse
+from services.reminder_service import get_user_reminders, get_unread_count, mark_reminder_as_read
 
 router = APIRouter()
 

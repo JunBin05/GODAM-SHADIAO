@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from backend.services.auto_translation_service import translate
+from services.auto_translation_service import translate
 
 def load_reminders() -> Dict:
     """Load reminders from mock data"""

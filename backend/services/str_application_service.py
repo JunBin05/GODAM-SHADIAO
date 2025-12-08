@@ -4,11 +4,11 @@ Handles STR 2026 application data collection, validation, and document checklist
 """
 
 from typing import Dict, List
-from backend.models.str_application import (
+from models.str_application import (
     STRApplication, ApplicantInfo, SpouseInfo, ChildInfo, GuardianInfo,
     DocumentItem, STRApplicationSummary, MaritalStatus
 )
-from backend.services.eligibility_service import check_eligibility
+from services.eligibility_service import check_eligibility
 
 
 def generate_document_checklist(marital_status: MaritalStatus, has_children: bool) -> List[DocumentItem]:

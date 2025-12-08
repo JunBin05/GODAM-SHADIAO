@@ -49,52 +49,52 @@ class GuardianRelationship(str, Enum):
 
 # Applicant Information
 class ApplicantInfo(BaseModel):
-    ic_number: str = Field(..., description="MyKad/IC number")
-    name: str = Field(..., description="Full name (auto from JPN)")
-    age: int = Field(..., description="Age (auto from JPN)")
-    gender: str = Field(..., description="Gender (auto from JPN)")
+    ic_number: Optional[str] = Field(None, description="MyKad/IC number")
+    name: Optional[str] = Field(None, description="Full name (auto from JPN)")
+    age: Optional[int] = Field(None, description="Age (auto from JPN)")
+    gender: Optional[str] = Field(None, description="Gender (auto from JPN)")
     phone_home: Optional[str] = Field(None, description="Home phone number")
-    phone_mobile: str = Field(..., description="Mobile phone number")
-    occupation: Occupation
-    household_monthly_income: float = Field(..., description="Gross household monthly income")
-    marital_status: MaritalStatus
+    phone_mobile: Optional[str] = Field(None, description="Mobile phone number")
+    occupation: Optional[Occupation] = Field(None)
+    household_monthly_income: Optional[float] = Field(None, description="Gross household monthly income")
+    marital_status: Optional[MaritalStatus] = Field(None)
     marital_date: Optional[date] = Field(None, description="Date of marriage/divorce/spouse death")
-    address: str = Field(..., description="Mailing address")
-    postcode: str = Field(..., description="Postcode")
-    city: str = Field(..., description="City (auto from postcode)")
-    state: str = Field(..., description="State (auto from postcode)")
-    bank_name: str = Field(..., description="Bank name (active bank)")
-    bank_account: str = Field(..., description="Bank account number")
-    email: EmailStr = Field(..., description="Email address")
+    address: Optional[str] = Field(None, description="Mailing address")
+    postcode: Optional[str] = Field(None, description="Postcode")
+    city: Optional[str] = Field(None, description="City (auto from postcode)")
+    state: Optional[str] = Field(None, description="State (auto from postcode)")
+    bank_name: Optional[str] = Field(None, description="Bank name (active bank)")
+    bank_account: Optional[str] = Field(None, description="Bank account number")
+    email: Optional[EmailStr] = Field(None, description="Email address")
 
 
 # Spouse Information (if married)
 class SpouseInfo(BaseModel):
-    id_type: IDType
-    id_number: str = Field(..., description="Identification number")
-    name: str = Field(..., description="Full name")
+    id_type: Optional[IDType] = Field(None)
+    id_number: Optional[str] = Field(None, description="Identification number")
+    name: Optional[str] = Field(None, description="Full name")
     gender: Optional[str] = Field(None, description="Gender (auto if MyKad)")
-    phone_mobile: str = Field(..., description="Mobile phone number")
-    occupation: Occupation
-    bank_name: str = Field(..., description="Bank name (active bank)")
-    bank_account: str = Field(..., description="Bank account number")
+    phone_mobile: Optional[str] = Field(None, description="Mobile phone number")
+    occupation: Optional[Occupation] = Field(None)
+    bank_name: Optional[str] = Field(None, description="Bank name (active bank)")
+    bank_account: Optional[str] = Field(None, description="Bank account number")
 
 
 # Child Information (up to 5)
 class ChildInfo(BaseModel):
-    id_number: str = Field(..., description="MyKad/MyKid number")
-    name: str = Field(..., description="Full name")
+    id_number: Optional[str] = Field(None, description="MyKad/MyKid number")
+    name: Optional[str] = Field(None, description="Full name")
     age: Optional[int] = Field(None, description="Age (auto if in JPN)")
-    status: ChildStatus = Field(..., description="Biological or adopted")
+    status: Optional[ChildStatus] = Field(None, description="Biological or adopted")
 
 
 # Guardian/Waris Information
 class GuardianInfo(BaseModel):
-    relationship: GuardianRelationship
-    id_type: IDType
-    id_number: str = Field(..., description="Identification number")
-    name: str = Field(..., description="Full name")
-    phone_mobile: str = Field(..., description="Mobile phone number")
+    relationship: Optional[GuardianRelationship] = Field(None)
+    id_type: Optional[IDType] = Field(None)
+    id_number: Optional[str] = Field(None, description="Identification number")
+    name: Optional[str] = Field(None, description="Full name")
+    phone_mobile: Optional[str] = Field(None, description="Mobile phone number")
     same_as_spouse: bool = Field(default=False, description="Copy from spouse info")
 
 
@@ -103,7 +103,7 @@ class STRApplication(BaseModel):
     applicant: ApplicantInfo
     spouse: Optional[SpouseInfo] = None
     children: List[ChildInfo] = Field(default_factory=list, max_items=5)
-    guardian: GuardianInfo
+    guardian: Optional[GuardianInfo] = None
     
     class Config:
         json_schema_extra = {

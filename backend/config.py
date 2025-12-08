@@ -8,13 +8,12 @@ JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRY_HOURS = 24
 
 # Program IDs
-PROGRAM_IDS = ["str", "sara", "mykasih"]
+PROGRAM_IDS = ["str", "sara"]
 
 # Program Names
 PROGRAM_NAMES = {
     "str": {"en": "Sumbangan Tunai Rahmah", "ms": "Sumbangan Tunai Rahmah"},
-    "sara": {"en": "SARA", "ms": "SARA"},
-    "mykasih": {"en": "MyKasih", "ms": "MyKasih"}
+    "sara": {"en": "SUMBANGAN ASAS RAHMAH (SARA)", "ms": "SUMBANGAN ASAS RAHMAH (SARA)"}
 }
 
 # QR Code Settings
@@ -51,14 +50,6 @@ ELIGIBILITY_RULES = {
                                "school_supplies", "household_cleaning"],
         "description": "Sumbangan Asas Rahmah - Cashless credit for 14 categories of basic necessities"
     },
-    "mykasih": {
-        # MyKasih operates through charity foundation for vulnerable families
-        "max_income": 2000,
-        "min_age": 18,
-        "base_amount": 200,
-        "disability_bonus": 50,
-        "description": "MyKasih Foundation - Charitable aid for vulnerable B40 families"
-    }
 }
 
 # Face/Voice Recognition Thresholds

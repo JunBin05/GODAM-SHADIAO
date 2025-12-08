@@ -4,8 +4,8 @@ Endpoints for STR 2026 application data collection and preparation
 """
 
 from fastapi import APIRouter, HTTPException, status, Query
-from backend.models.str_application import STRApplication, STRApplicationSummary, ApplicationProgress
-from backend.services.str_application_service import prepare_str_application, validate_application_data
+from models.str_application import STRApplication, STRApplicationSummary, ApplicationProgress
+from services.str_application_service import prepare_str_application, validate_application_data
 
 router = APIRouter()
 
