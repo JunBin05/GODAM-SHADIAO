@@ -64,3 +64,8 @@ ELIGIBILITY_RULES = {
 # Face/Voice Recognition Thresholds
 FACE_MATCH_THRESHOLD = 0.6
 VOICE_MATCH_THRESHOLD = 0.7
+
+# Google API Keys
+# Replace with your actual API keys from Google Cloud Console
+GOOGLE_MAPS_API_KEY = "AIzaSyDZQwC7JyMymdJFThu-lNBu45NjOBBqbIc"  # For Maps/Geocoding (optional - store locator works without it)
+GOOGLE_TRANSLATE_API_KEY = ""  # Optional - currently using free googletrans library

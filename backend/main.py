@@ -43,12 +43,13 @@ async def health_check():
     }
 
 # Router registration
-from backend.routes import auth, aid, store, payment, reminder
+from backend.routes import auth, aid, store, payment, reminder, str_application
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(aid.router, prefix="/api/aid", tags=["Aid Programs"])
 app.include_router(store.router, prefix="/api/stores", tags=["Store Locator"])
 app.include_router(payment.router, prefix="/api/payment", tags=["QR Payment"])
 app.include_router(reminder.router, prefix="/api/reminders", tags=["Reminders & Notifications"])
+app.include_router(str_application.router, prefix="/api/str-application", tags=["STR Application Helper"])
 
 if __name__ == "__main__":
     import uvicorn
