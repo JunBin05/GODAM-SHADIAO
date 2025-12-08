@@ -128,7 +128,7 @@ const MyKasihPage = () => {
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#6b7280' }}>
                   <Wallet size={24} />
-                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>MyKasih Balance</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{t('myKasihBalance')}</span>
                 </div>
                 
                 <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#2563eb' }}>
@@ -136,11 +136,15 @@ const MyKasihPage = () => {
                 </div>
                 
                 <div style={{ fontSize: '0.9rem', color: '#ef4444', fontWeight: 'bold', backgroundColor: '#fee2e2', padding: '4px 12px', borderRadius: '20px' }}>
-                  Expires: {status.myKasihExpiry}
+                  {t('expires')}: {status.myKasihExpiry}
+                </div>
+
+                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '5px', fontStyle: 'italic' }}>
+                  {t('limitNote')}
                 </div>
 
                 <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '5px' }}>
-                  Last: {status.lastTransaction}
+                  {t('lastTransaction')}: {status.lastTransaction}
                 </div>
                 
                 <button 
@@ -164,7 +168,7 @@ const MyKasihPage = () => {
                   }}
                 >
                   <QrCode size={20} />
-                  Pay Now
+                  {t('payNow')}
                 </button>
               </div>
 
@@ -196,7 +200,7 @@ const MyKasihPage = () => {
                   <div style={{ backgroundColor: '#d1fae5', padding: '5px', borderRadius: '50%' }}>
                     <Banknote size={20} color="#10b981" />
                   </div>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>SARA Balance</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{t('saraBalance')}</span>
                 </div>
                 
                 <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#10b981' }}>
@@ -204,12 +208,12 @@ const MyKasihPage = () => {
                 </div>
                 
                 <div style={{ fontSize: '0.9rem', color: '#059669', fontWeight: 'bold', backgroundColor: '#d1fae5', padding: '4px 12px', borderRadius: '20px' }}>
-                  Carries Forward (No Expiry)
+                  {t('carriesForward')}
                 </div>
 
                 <div style={{ marginTop: '15px', width: '100%', backgroundColor: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px dashed #86efac' }}>
                   <div style={{ fontSize: '0.85rem', color: '#6b7280', textAlign: 'center', marginBottom: '5px' }}>
-                    Upcoming SARA Payment
+                    {t('upcomingSara')}
                   </div>
                   <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#059669', textAlign: 'center' }}>
                     {status.saraNextPayment}
@@ -237,7 +241,7 @@ const MyKasihPage = () => {
                   }}
                 >
                   <QrCode size={20} />
-                  Pay with SARA
+                  {t('payWithSara')}
                 </button>
               </div>
 
@@ -246,7 +250,7 @@ const MyKasihPage = () => {
             {/* Shops Map Section */}
             <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
               <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#1f2937' }}>
-                <Store color="#2563eb" /> Nearby MyKasih Merchants
+                <Store color="#2563eb" /> {t('nearbyMerchants')}
               </h3>
               
               {/* Mock Map Visual */}
@@ -265,7 +269,7 @@ const MyKasihPage = () => {
                 overflow: 'hidden'
               }}>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#9ca3af', fontWeight: 'bold' }}>
-                  Interactive Map View
+                  {t('interactiveMap')}
                 </div>
                 {/* Mock Pins */}
                 <MapPin size={32} color="#2563eb" style={{ position: 'absolute', top: '20%', left: '30%' }} />
@@ -283,13 +287,13 @@ const MyKasihPage = () => {
                       <div style={{ fontWeight: 'bold', color: '#1f2937' }}>{shop.name}</div>
                       <div style={{ fontSize: '0.9rem', color: '#6b7280', margin: '3px 0' }}>{shop.address}</div>
                       <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem' }}>
-                        <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{shop.distance} away</span>
+                        <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{shop.distance} {t('away')}</span>
                         <span style={{ color: '#9ca3af' }}>•</span>
                         <span style={{ color: '#4b5563' }}>{shop.type}</span>
                       </div>
                     </div>
                     <button style={{ padding: '8px 12px', backgroundColor: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-                      Navigate
+                      {t('navigate')}
                     </button>
                   </div>
                 ))}
@@ -325,7 +329,7 @@ const MyKasihPage = () => {
                 <XCircle size={48} color="#e11d48" />
               </div>
               <div>
-                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>Not Eligible</h2>
+                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>{t('notEligible')}</h2>
                 <p style={{ margin: '10px 0 0 0', color: '#9f1239', fontSize: '1.1rem' }}>
                   You are currently not eligible for MyKasih aid.
                 </p>
@@ -335,7 +339,7 @@ const MyKasihPage = () => {
             {/* Still show shops? Yes, per request "map of all the shops" */}
             <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
               <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#1f2937' }}>
-                <Store color="#2563eb" /> Nearby MyKasih Merchants
+                <Store color="#2563eb" /> {t('nearbyMerchants')}
               </h3>
               <p style={{ color: '#6b7280', marginBottom: '15px' }}>Even if you are not eligible, you can still visit these partner stores.</p>
               
@@ -355,7 +359,7 @@ const MyKasihPage = () => {
                 overflow: 'hidden'
               }}>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#9ca3af', fontWeight: 'bold' }}>
-                  Interactive Map View
+                  {t('interactiveMap')}
                 </div>
                 <MapPin size={32} color="#2563eb" style={{ position: 'absolute', top: '30%', left: '40%' }} />
                 <MapPin size={32} color="#2563eb" style={{ position: 'absolute', top: '60%', left: '70%' }} />
@@ -393,8 +397,8 @@ const MyKasihPage = () => {
             gap: '20px',
             textAlign: 'center'
           }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ margin: 0, color: '#1f2937' }}>Scan to Pay</h2>
-            <p style={{ margin: 0, color: '#6b7280' }}>Show this QR code to the cashier to use your MyKasih balance.</p>
+            <h2 style={{ margin: 0, color: '#1f2937' }}>{t('scanToPay')}</h2>
+            <p style={{ margin: 0, color: '#6b7280' }}>{t('scanInstruction')}</p>
             
             <div style={{ padding: '20px', border: '2px dashed #2563eb', borderRadius: '10px' }}>
               <img 
@@ -421,7 +425,7 @@ const MyKasihPage = () => {
                 width: '100%'
               }}
             >
-              Close
+              {t('close')}
             </button>
           </div>
         </div>

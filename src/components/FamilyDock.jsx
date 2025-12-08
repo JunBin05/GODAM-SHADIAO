@@ -45,7 +45,7 @@ const FamilyDock = () => {
     
     // Check if already a member
     if (members.some(m => m.ic === newIc)) {
-      alert("This user is already in your family list.");
+      alert(t('alreadyMember'));
       return;
     }
 
@@ -64,14 +64,14 @@ const FamilyDock = () => {
     // Check if request already exists
     const existing = allRequests.find(r => r.fromIc === currentUser.icNumber && r.toIc === newIc && r.status === 'pending');
     if (existing) {
-      alert("Request already sent.");
+      alert(t('alreadySent'));
       return;
     }
 
     allRequests.push(newRequest);
     localStorage.setItem('family_requests', JSON.stringify(allRequests));
     
-    alert(`Request sent to IC: ${newIc}`);
+    alert(`${t('requestSent')}: ${newIc}`);
     setNewIc('');
   };
 
@@ -126,7 +126,7 @@ const FamilyDock = () => {
           animation: 'slideUp 0.3s ease-out'
         }}>
           <div style={{ padding: '15px', backgroundColor: '#2563eb', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>My Family</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>{t('myFamily')}</h3>
             <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
               <X size={20} />
             </button>
@@ -138,7 +138,7 @@ const FamilyDock = () => {
             {requests.length > 0 && (
               <div style={{ marginBottom: '15px' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#ef4444', marginBottom: '8px', paddingLeft: '5px' }}>
-                  PENDING REQUESTS ({requests.length})
+                  {t('pendingRequests')} ({requests.length})
                 </div>
                 {requests.map((req) => (
                   <div key={req.id} style={{ 
@@ -150,7 +150,7 @@ const FamilyDock = () => {
                   }}>
                     <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '4px' }}>{req.fromName}</div>
                     <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '8px' }}>IC: {req.fromIc}</div>
-                    <div style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '10px' }}>Is this your family member?</div>
+                    <div style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '10px' }}>{t('wantsToAdd')}</div>
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <button 
                         onClick={() => handleAccept(req)}
@@ -168,7 +168,7 @@ const FamilyDock = () => {
                           gap: '5px'
                         }}
                       >
-                        <Check size={16} /> Yes
+                        <Check size={16} /> {t('accept')}
                       </button>
                       <button 
                         onClick={() => handleReject(req.id)}
@@ -186,7 +186,7 @@ const FamilyDock = () => {
                           gap: '5px'
                         }}
                       >
-                        <X size={16} /> No
+                        <X size={16} /> {t('reject')}
                       </button>
                     </div>
                   </div>
@@ -197,7 +197,7 @@ const FamilyDock = () => {
 
             {/* Family List */}
             {members.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', padding: '20px' }}>No family members added yet.</p>
+              <p style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', padding: '20px' }}>{t('noFamilyMembers')}</p>
             ) : (
               members.map((member, index) => (
                 <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderBottom: '1px solid #f3f4f6' }}>
@@ -217,7 +217,7 @@ const FamilyDock = () => {
             <div style={{ display: 'flex', gap: '10px' }}>
               <input 
                 type="text" 
-                placeholder="Enter IC Number" 
+                placeholder={t('enterIC')}
                 value={newIc}
                 onChange={(e) => setNewIc(e.target.value)}
                 style={{ 

@@ -66,13 +66,13 @@ const MainPage = () => {
     const lowerText = text.toLowerCase();
 
     if (lowerText.includes('money') || lowerText.includes('duit') || lowerText.includes('wang') || lowerText.includes('cash')) {
-      response = "You can check your STR status by clicking the button on the right.";
+      response = t('aiCheckStr');
     } else if (lowerText.includes('help') || lowerText.includes('tolong') || lowerText.includes('bantu')) {
-      response = "I am here to help. Press the button to ask about MyKasih or STR.";
+      response = t('aiHelp');
     } else if (lowerText.includes('register') || lowerText.includes('daftar')) {
-      response = "You are already registered and logged in.";
+      response = t('aiRegistered');
     } else {
-      response = `I heard you say: "${text}". How can I help you with MyKasih or STR?`;
+      response = t('aiDefault').replace('{text}', text);
     }
 
     setAiResponse(response);

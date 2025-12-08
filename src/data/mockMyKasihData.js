@@ -2,7 +2,7 @@ export const myKasihData = {
   // Eligible User (e.g., Ah Gong)
   "111": {
     eligible: true,
-    balance: "RM 1,200.00",
+    balance: "RM 50.00",
     myKasihExpiry: "31 Dec 2025",
     saraBalance: "RM 600.00",
     saraNextPayment: "01 Jan 2026",
