@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, LogOut, Wallet, QrCode, MapPin, Store, XCircle, CheckCircle, Banknote } from 'lucide-react';
+import { ArrowLeft, LogOut, Wallet, QrCode, MapPin, Store, XCircle, CheckCircle, Banknote, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
@@ -12,13 +12,23 @@ const MyKasihPage = () => {
   const [userData, setUserData] = useState(null);
   const [status, setStatus] = useState(null);
   const [showQR, setShowQR] = useState(false);
+  
+  // Family Payment State
+  const [familyMembers, setFamilyMembers] = useState([]);
+  const [selectedPayer, setSelectedPayer] = useState(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('registeredUser');
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setUserData(user);
+      setSelectedPayer({ name: user.name, ic: user.icNumber });
       
+      // Load family members
+      const members = JSON.parse(localStorage.getItem(`family_members_${user.icNumber}`) || '[]');
+      setFamilyMembers(members);
+
       // Check eligibility
       const userMyKasihData = myKasihData[user.icNumber];
       if (userMyKasihData) {
@@ -28,6 +38,33 @@ const MyKasihPage = () => {
       }
     }
   }, []);
+
+  const handleSimulatePayment = () => {
+    if (!selectedPayer || !userData) return;
+
+    // If paying for someone else, send notification
+    if (selectedPayer.ic !== userData.icNumber) {
+      const notification = {
+        id: Date.now(),
+        type: 'payment_on_behalf',
+        fromName: userData.name,
+        amount: 'RM 50.00', // Mock amount
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+
+      // Store in recipient's notifications
+      const recipientKey = `notifications_${selectedPayer.ic}`;
+      const existing = JSON.parse(localStorage.getItem(recipientKey) || '[]');
+      existing.push(notification);
+      localStorage.setItem(recipientKey, JSON.stringify(existing));
+      
+      alert(`Payment simulated! Notification sent to ${selectedPayer.name}.`);
+    } else {
+      alert('Payment simulated successfully!');
+    }
+    setShowQR(false);
+  };
 
   return (
     <div className="page-container">
@@ -147,29 +184,33 @@ const MyKasihPage = () => {
                   {t('lastTransaction')}: {status.lastTransaction}
                 </div>
                 
-                <button 
-                  onClick={() => setShowQR(true)}
-                  style={{
-                    marginTop: 'auto',
-                    backgroundColor: '#2563eb',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50px',
-                    padding: '12px 30px',
-                    fontSize: '1.1rem',
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)',
-                    width: '100%',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <QrCode size={20} />
-                  {t('payNow')}
-                </button>
+                <div style={{ marginTop: 'auto', width: '100%' }}>
+                  <p style={{ fontSize: '0.75rem', color: '#ef4444', textAlign: 'center', marginBottom: '5px', fontStyle: 'italic' }}>
+                    * Max RM50 limit when paying for family members
+                  </p>
+                  <button 
+                    onClick={() => setShowQR(true)}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50px',
+                      padding: '12px 30px',
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)',
+                      width: '100%',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <QrCode size={20} />
+                    {t('payNow')}
+                  </button>
+                </div>
               </div>
 
               {/* Card 2: SARA Balance */}
@@ -371,7 +412,7 @@ const MyKasihPage = () => {
       </main>
 
       {/* QR Code Modal */}
-      {showQR && userData && (
+      {showQR && userData && selectedPayer && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -400,33 +441,151 @@ const MyKasihPage = () => {
             <h2 style={{ margin: 0, color: '#1f2937' }}>{t('scanToPay')}</h2>
             <p style={{ margin: 0, color: '#6b7280' }}>{t('scanInstruction')}</p>
             
-            <div style={{ padding: '20px', border: '2px dashed #2563eb', borderRadius: '10px' }}>
+            <div style={{ padding: '20px', border: '2px dashed #2563eb', borderRadius: '10px', backgroundColor: 'white' }}>
               <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${userData.icNumber}`} 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedPayer.ic}`} 
                 alt="MyKasih QR Code" 
                 style={{ width: '200px', height: '200px' }}
               />
             </div>
             
-            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#2563eb' }}>
-              {userData.name}
+            {/* Payer Selection Dropdown */}
+            <div style={{ position: 'relative', width: '100%' }}>
+              <button 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  color: '#2563eb',
+                  background: 'none',
+                  border: '1px solid #bfdbfe',
+                  padding: '10px',
+                  borderRadius: '10px',
+                  width: '100%',
+                  cursor: 'pointer',
+                  backgroundColor: '#eff6ff'
+                }}
+              >
+                {selectedPayer.name}
+                {isDropdownOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </button>
+
+              {isDropdownOpen && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: 0,
+                  width: '100%',
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                  marginBottom: '5px',
+                  overflow: 'hidden',
+                  zIndex: 10
+                }}>
+                  {/* Current User Option */}
+                  <div 
+                    onClick={() => {
+                      setSelectedPayer({ name: userData.name, ic: userData.icNumber });
+                      setIsDropdownOpen(false);
+                    }}
+                    style={{
+                      padding: '12px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #f3f4f6',
+                      backgroundColor: selectedPayer.ic === userData.icNumber ? '#eff6ff' : 'white',
+                      color: selectedPayer.ic === userData.icNumber ? '#2563eb' : '#374151'
+                    }}
+                  >
+                    {userData.name} (Me)
+                  </div>
+
+                  {/* Family Members */}
+                  {familyMembers.map(member => {
+                    const isEligible = myKasihData[member.ic]?.eligible;
+                    return (
+                      <div 
+                        key={member.ic}
+                        onClick={() => {
+                          if (isEligible) {
+                            setSelectedPayer(member);
+                            setIsDropdownOpen(false);
+                          }
+                        }}
+                        style={{
+                          padding: '12px',
+                          cursor: isEligible ? 'pointer' : 'not-allowed',
+                          borderBottom: '1px solid #f3f4f6',
+                          backgroundColor: selectedPayer.ic === member.ic ? '#eff6ff' : (isEligible ? 'white' : '#f9fafb'),
+                          color: selectedPayer.ic === member.ic ? '#2563eb' : (isEligible ? '#374151' : '#9ca3af'),
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <span>{member.name}</span>
+                        {!isEligible && (
+                          <span style={{ 
+                            fontSize: '0.7rem', 
+                            color: '#ef4444', 
+                            border: '1px solid #ef4444', 
+                            padding: '2px 6px', 
+                            borderRadius: '10px',
+                            fontWeight: 'bold'
+                          }}>
+                            Not Eligible
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
+            {selectedPayer.ic !== userData.icNumber && (
+               <p style={{ fontSize: '0.8rem', color: '#ef4444', margin: 0 }}>
+                 Paying on behalf (Limit: RM50)
+               </p>
+            )}
             
-            <button 
-              onClick={() => setShowQR(false)}
-              style={{
-                backgroundColor: '#f3f4f6',
-                color: '#4b5563',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '12px 30px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                width: '100%'
-              }}
-            >
-              {t('close')}
-            </button>
+            <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+              <button 
+                onClick={() => setShowQR(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#f3f4f6',
+                  color: '#4b5563',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('close')}
+              </button>
+              <button 
+                onClick={handleSimulatePayment}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Simulate Pay
+              </button>
+            </div>
           </div>
         </div>
       )}

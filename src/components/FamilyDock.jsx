@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, X, User, Check, Bell } from 'lucide-react';
+import { Users, Plus, X, User, Check, Bell, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 const FamilyDock = () => {
@@ -110,6 +110,21 @@ const FamilyDock = () => {
     setRequests(requests.filter(r => r.id !== requestId));
   };
 
+  const handleRemoveMember = (memberToRemove) => {
+    if (!window.confirm(`Are you sure you want to remove ${memberToRemove.name}?`)) return;
+
+    // 1. Remove from my list
+    const myUpdatedMembers = members.filter(m => m.ic !== memberToRemove.ic);
+    setMembers(myUpdatedMembers);
+    localStorage.setItem(`family_members_${currentUser.icNumber}`, JSON.stringify(myUpdatedMembers));
+
+    // 2. Remove me from their list
+    const theirKey = `family_members_${memberToRemove.ic}`;
+    const theirMembers = JSON.parse(localStorage.getItem(theirKey) || '[]');
+    const theirUpdatedMembers = theirMembers.filter(m => m.ic !== currentUser.icNumber);
+    localStorage.setItem(theirKey, JSON.stringify(theirUpdatedMembers));
+  };
+
   return (
     <div className="family-dock-container" style={{ position: 'fixed', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
       
@@ -204,10 +219,17 @@ const FamilyDock = () => {
                   <div style={{ backgroundColor: '#e0f2fe', padding: '8px', borderRadius: '50%', flexShrink: 0 }}>
                     <User size={20} color="#0284c7" />
                   </div>
-                  <div style={{ overflow: 'hidden' }}>
+                  <div style={{ overflow: 'hidden', flex: 1 }}>
                     <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.name}</div>
                     <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{member.ic}</div>
                   </div>
+                  <button 
+                    onClick={() => handleRemoveMember(member)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }}
+                    title="Remove member"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               ))
             )}

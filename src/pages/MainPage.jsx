@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Mic, HeartHandshake, Banknote } from 'lucide-react';
+import { LogOut, Mic, HeartHandshake, Banknote, Bell, Calendar, Clock, AlertCircle, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
+import { myKasihData } from '../data/mockMyKasihData';
+import { strData } from '../data/mockStrData';
 
 const MainPage = () => {
   const navigate = useNavigate();
@@ -14,14 +16,74 @@ const MainPage = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [reminders, setReminders] = useState({ myKasih: null, sara: null, str: null });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   const recognitionRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
 
+  // Helper for days left
+  const getDaysLeft = (dateString) => {
+    if (!dateString) return null;
+    let targetDate = new Date(dateString);
+    if (isNaN(targetDate.getTime())) {
+       // Try appending " 1" for "Month Year" format (e.g. "November 2025")
+       targetDate = new Date("1 " + dateString);
+    }
+    if (isNaN(targetDate.getTime())) return null;
+    
+    const today = new Date();
+    const diffTime = targetDate - today;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   useEffect(() => {
     const storedUser = localStorage.getItem('registeredUser');
     if (storedUser) {
-      setUserData(JSON.parse(storedUser));
+      const user = JSON.parse(storedUser);
+      setUserData(user);
+
+      // Load Requests
+      const loadRequests = () => {
+        const allRequests = JSON.parse(localStorage.getItem('family_requests') || '[]');
+        const myRequests = allRequests.filter(req => req.toIc === user.icNumber && req.status === 'pending');
+        setRequests(myRequests);
+      };
+      loadRequests();
+      const interval = setInterval(loadRequests, 2000);
+
+      // Load Reminders
+      const mkData = myKasihData[user.icNumber];
+      const sData = strData[user.icNumber];
+      const newReminders = {};
+
+      if (mkData && mkData.eligible) {
+        const mkDays = getDaysLeft(mkData.myKasihExpiry);
+        if (mkDays !== null && mkDays >= 0) {
+             newReminders.myKasih = { date: mkData.myKasihExpiry, days: mkDays };
+        }
+        
+        const saraDays = getDaysLeft(mkData.saraNextPayment);
+        if (saraDays !== null && saraDays >= 0) {
+            newReminders.sara = { date: mkData.saraNextPayment, days: saraDays };
+        }
+      }
+      
+      if (sData && sData.eligible && sData.upcoming) {
+        // Find future payment
+        const nextPayment = sData.upcoming.find(p => {
+            const d = getDaysLeft(p.date);
+            return d !== null && d >= 0 && (p.status === 'Scheduled' || p.status === 'Pending');
+        });
+        
+        if (nextPayment) {
+           newReminders.str = { date: nextPayment.date, days: getDaysLeft(nextPayment.date), amount: nextPayment.amount };
+        }
+      }
+      setReminders(newReminders);
+
+      return () => clearInterval(interval);
     }
   }, []);
 
@@ -147,7 +209,7 @@ const MainPage = () => {
   return (
     <div className="page-container main-page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Header */}
-      <header className="landing-header" style={{ flexShrink: 0, position: 'relative' }}>
+      <header className="landing-header" style={{ flexShrink: 0, position: 'relative', zIndex: 60 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <div className="logo-placeholder">{t('appTitle')}</div>
           <div style={{ width: '3px', height: '40px', backgroundColor: '#9ca3af' }}></div>
@@ -165,7 +227,7 @@ const MainPage = () => {
             textAlign: 'center',
             width: 'max-content',
             gap: '20px',
-            pointerEvents: 'none' // Prevent blocking clicks if it overlaps (though it shouldn't)
+            pointerEvents: 'none'
           }}>
             <span style={{ fontWeight: 'bold', color: 'black', fontSize: '1.5rem' }}>{userData.name}</span>
             <span style={{ fontWeight: 'bold', color: 'black', fontSize: '1.5rem' }}>{userData.icNumber}</span>
@@ -195,29 +257,144 @@ const MainPage = () => {
         </div>
       </header>
 
-      {/* Main Content (Chat Area) */}
-      <main style={{ flexGrow: 1, padding: '20px', paddingBottom: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Welcome Message */}
-        {!transcript && !aiResponse && (
-          <div style={{ textAlign: 'center', marginTop: '50px', color: '#6b7280' }}>
-            <p style={{ fontSize: '1.5rem' }}>{t('mainWelcome')}</p>
+      <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden', position: 'relative' }}>
+        
+        {/* Sidebar */}
+        {isSidebarOpen && (
+          <div className="sidebar-panel" style={{
+            width: '300px',
+            backgroundColor: 'white',
+            borderRight: '1px solid #e5e7eb',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '25px',
+            overflowY: 'auto',
+            flexShrink: 0,
+            animation: 'slideRight 0.5s ease-out',
+            zIndex: 50,
+            boxShadow: '2px 0 10px rgba(0,0,0,0.05)',
+            position: 'relative'
+          }}>
+            {/* Close Button */}
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#9ca3af'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            {/* Notifications Section */}
+            <div>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1f2937', marginTop: 0 }}>
+                <Bell size={20} color="#ef4444" /> Notifications
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                {requests.length > 0 ? (
+                  requests.map(req => (
+                    <div key={req.id} style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{req.fromName}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>wants to add you as family.</div>
+                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '5px', fontWeight: 'bold' }}>Check Family Dock</div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.9rem' }}>No new notifications</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ height: '1px', backgroundColor: '#e5e7eb' }}></div>
+
+            {/* Reminders Section */}
+            <div>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1f2937', marginTop: 0 }}>
+                <Calendar size={20} color="#2563eb" /> Reminders
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
+                
+                {/* MyKasih Expiry */}
+                {reminders.myKasih && (
+                  <div style={{ padding: '12px', backgroundColor: '#fff7ed', borderRadius: '10px', border: '1px solid #fed7aa' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <Clock size={16} color="#ea580c" />
+                      <span style={{ fontWeight: 'bold', color: '#9a3412', fontSize: '0.9rem' }}>MyKasih Expiry</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#c2410c' }}>
+                      {reminders.myKasih.days} days left
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#9a3412' }}>Due: {reminders.myKasih.date}</div>
+                  </div>
+                )}
+
+                {/* SARA Payment */}
+                {reminders.sara && (
+                  <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <Banknote size={16} color="#16a34a" />
+                      <span style={{ fontWeight: 'bold', color: '#166534', fontSize: '0.9rem' }}>Next SARA</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#15803d' }}>
+                      {reminders.sara.days} days left
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#166534' }}>Date: {reminders.sara.date}</div>
+                  </div>
+                )}
+
+                {/* STR Payment */}
+                {reminders.str && (
+                  <div style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <Banknote size={16} color="#2563eb" />
+                      <span style={{ fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}>Next STR ({reminders.str.amount})</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#1d4ed8' }}>
+                      {reminders.str.days} days left
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#1e40af' }}>Expected: {reminders.str.date}</div>
+                  </div>
+                )}
+
+                {!reminders.myKasih && !reminders.sara && !reminders.str && (
+                   <div style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.9rem' }}>No upcoming reminders</div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* User Transcript */}
-        {transcript && (
-          <div style={{ alignSelf: 'flex-end', backgroundColor: '#dbeafe', padding: '15px', borderRadius: '15px 15px 0 15px', maxWidth: '80%' }}>
-            <p style={{ margin: 0, color: '#1e40af' }}>{transcript}</p>
-          </div>
-        )}
+        {/* Main Content (Chat Area) */}
+        <main style={{ flexGrow: 1, padding: '20px', paddingBottom: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Welcome Message */}
+          {!transcript && !aiResponse && (
+            <div style={{ textAlign: 'center', marginTop: '50px', color: '#6b7280' }}>
+              <p style={{ fontSize: '1.5rem' }}>{t('mainWelcome')}</p>
+            </div>
+          )}
 
-        {/* AI Response */}
-        {aiResponse && (
-          <div style={{ alignSelf: 'flex-start', backgroundColor: '#f3f4f6', padding: '15px', borderRadius: '15px 15px 15px 0', maxWidth: '80%', border: '1px solid #e5e7eb' }}>
-            <p style={{ margin: 0, color: '#374151' }}>{aiResponse}</p>
-          </div>
-        )}
-      </main>
+          {/* User Transcript */}
+          {transcript && (
+            <div style={{ alignSelf: 'flex-end', backgroundColor: '#dbeafe', padding: '15px', borderRadius: '15px 15px 0 15px', maxWidth: '80%' }}>
+              <p style={{ margin: 0, color: '#1e40af' }}>{transcript}</p>
+            </div>
+          )}
+
+          {/* AI Response */}
+          {aiResponse && (
+            <div style={{ alignSelf: 'flex-start', backgroundColor: '#f3f4f6', padding: '15px', borderRadius: '15px 15px 15px 0', maxWidth: '80%', border: '1px solid #e5e7eb' }}>
+              <p style={{ margin: 0, color: '#374151' }}>{aiResponse}</p>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Floating Bottom Dock */}
       <div style={{ 
@@ -335,8 +512,67 @@ const MainPage = () => {
         </button>
       </div>
 
+      {/* Floating Bell Button (When Sidebar Closed) */}
+      {!isSidebarOpen && (
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="bell-trigger"
+          style={{
+            position: 'fixed',
+            bottom: '130px', // Desktop default
+            left: '30px',
+            zIndex: 90,
+            backgroundColor: 'white',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          <Bell size={32} color="#2563eb" />
+          {(requests.length > 0 || Object.keys(reminders).length > 0) && (
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              right: '0',
+              width: '16px',
+              height: '16px',
+              backgroundColor: '#ef4444',
+              borderRadius: '50%',
+              border: '2px solid white'
+            }} />
+          )}
+        </button>
+      )}
+
       {/* Family Dock */}
       <FamilyDock />
+
+      <style>{`
+        @keyframes slideRight {
+          from { transform: translateX(-50px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @media (max-width: 768px) {
+          .bell-trigger {
+            bottom: 260px !important;
+            left: 20px !important;
+          }
+          .sidebar-panel {
+            position: absolute !important;
+            height: 100% !important;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.1) !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
