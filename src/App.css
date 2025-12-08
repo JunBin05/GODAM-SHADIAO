@@ -555,3 +555,10 @@ body {
   }
 }
 
+.nav-icon-btn {
+  transition: transform 0.2s ease;
+}
+.nav-icon-btn:hover {
+  transform: scale(1.1);
+}
+

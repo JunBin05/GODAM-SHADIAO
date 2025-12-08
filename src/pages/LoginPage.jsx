@@ -16,6 +16,20 @@ const LoginPage = () => {
   const [isVerifying, setIsVerifying] = useState(false);
 
   const handleCheckIC = () => {
+    // Backdoor for testing STR/MyKasih logic
+    if (icInput === '111' || icInput === '222') {
+      const mockUser = {
+        name: icInput === '111' ? 'Ah Gong (Eligible)' : 'Ah Ma (Not Eligible)',
+        icNumber: icInput,
+        address: '123 Test Street'
+      };
+      localStorage.setItem('registeredUser', JSON.stringify(mockUser));
+      setUserData(mockUser);
+      setError('');
+      setStep('select-method');
+      return;
+    }
+
     const storedUser = localStorage.getItem('registeredUser');
     if (storedUser) {
       const user = JSON.parse(storedUser);

@@ -4,6 +4,8 @@ import LandingPage from './pages/LandingPage';
 import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import MainPage from './pages/MainPage';
+import MyKasihPage from './pages/MyKasihPage';
+import STRPage from './pages/STRPage';
 import './App.css';
 
 function App() {
@@ -16,6 +18,8 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/main" element={<MainPage />} />
+            <Route path="/mykasih" element={<MyKasihPage />} />
+            <Route path="/str" element={<STRPage />} />
           </Routes>
         </div>
       </Router>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, Mic, HeartHandshake, Banknote } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
+import FamilyDock from '../components/FamilyDock';
 
 const MainPage = () => {
   const navigate = useNavigate();
@@ -101,20 +102,42 @@ const MainPage = () => {
     synthRef.current.speak(utterance);
   };
 
-  const startListening = () => {
+  const startListening = (e) => {
+    // Prevent default behavior to avoid scrolling/context menu/selection
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    
+    // Capture pointer to ensure we get the up event even if they move slightly off
+    if (e.target.setPointerCapture) {
+      try {
+        e.target.setPointerCapture(e.pointerId);
+      } catch (err) {
+        console.error("Pointer capture error:", err);
+      }
+    }
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.start();
         setIsListening(true);
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error("Start error:", err);
       }
     } else {
       alert("Speech recognition not supported in this browser.");
     }
   };
 
-  const stopListening = () => {
+  const stopListening = (e) => {
+    if (e.target.releasePointerCapture) {
+      try {
+        e.target.releasePointerCapture(e.pointerId);
+      } catch (err) {
+        console.error("Pointer release error:", err);
+      }
+    }
+    
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
@@ -214,18 +237,22 @@ const MainPage = () => {
         width: 'max-content'
       }}>
         {/* Left Button: MyKasih */}
-        <button style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'flex-end',
-          background: 'none', 
-          border: 'none', 
-          color: '#4b5563',
-          cursor: 'pointer',
-          width: '90px', // Fixed width for symmetry
-          textAlign: 'center'
-        }}>
+        <button 
+          onClick={() => navigate('/mykasih')}
+          className="nav-icon-btn"
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'flex-end',
+            background: 'none', 
+            border: 'none', 
+            color: '#4b5563',
+            cursor: 'pointer',
+            width: '90px', // Fixed width for symmetry
+            textAlign: 'center'
+          }}
+        >
           <div style={{ backgroundColor: '#fce7f3', padding: '12px', borderRadius: '50%', marginBottom: '5px' }}>
             <HeartHandshake size={28} color="#ec4899" />
           </div>
@@ -256,11 +283,12 @@ const MainPage = () => {
           </p>
           
           <button
-            onMouseDown={startListening}
-            onMouseUp={stopListening}
-            onTouchStart={startListening}
-            onTouchEnd={stopListening}
+            onPointerDown={startListening}
+            onPointerUp={stopListening}
+            onPointerLeave={stopListening}
+            onContextMenu={(e) => e.preventDefault()}
             style={{
+              touchAction: 'none',
               width: '110px', // Much larger
               height: '110px',
               borderRadius: '50%',
@@ -272,7 +300,11 @@ const MainPage = () => {
               justifyContent: 'center',
               cursor: 'pointer',
               transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              transform: isListening ? 'scale(1.05)' : 'scale(1.2) translateY(-25px)' // Pop out effect
+              transform: isListening ? 'scale(1.05)' : 'scale(1.2) translateY(-25px)', // Pop out effect
+              touchAction: 'none', // Critical for mobile: prevents scrolling/gestures
+              userSelect: 'none', // Prevents text selection
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none' // Prevents iOS context menu
             }}
           >
             <Mic size={55} color="white" />
@@ -280,24 +312,31 @@ const MainPage = () => {
         </div>
 
         {/* Right Button: STR */}
-        <button style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'flex-end',
-          background: 'none', 
-          border: 'none', 
-          color: '#4b5563',
-          cursor: 'pointer',
-          width: '90px', // Fixed width for symmetry
-          textAlign: 'center'
-        }}>
+        <button 
+          onClick={() => navigate('/str')}
+          className="nav-icon-btn"
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'flex-end',
+            background: 'none', 
+            border: 'none', 
+            color: '#4b5563',
+            cursor: 'pointer',
+            width: '90px', // Fixed width for symmetry
+            textAlign: 'center'
+          }}
+        >
           <div style={{ backgroundColor: '#d1fae5', padding: '12px', borderRadius: '50%', marginBottom: '5px' }}>
             <Banknote size={28} color="#10b981" />
           </div>
           <span style={{ fontSize: '0.75rem', fontWeight: 'bold', lineHeight: '1.2' }}>{t('str')}</span>
         </button>
       </div>
+
+      {/* Family Dock */}
+      <FamilyDock />
     </div>
   );
 };
