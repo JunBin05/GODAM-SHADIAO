@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, X, User, Check, Bell, Trash2 } from 'lucide-react';
+import { Users, Plus, X, User, Check, Bell } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 const FamilyDock = () => {
@@ -45,7 +45,7 @@ const FamilyDock = () => {
     
     // Check if already a member
     if (members.some(m => m.ic === newIc)) {
-      alert(t('alreadyMember'));
+      alert("This user is already in your family list.");
       return;
     }
 
@@ -64,14 +64,14 @@ const FamilyDock = () => {
     // Check if request already exists
     const existing = allRequests.find(r => r.fromIc === currentUser.icNumber && r.toIc === newIc && r.status === 'pending');
     if (existing) {
-      alert(t('alreadySent'));
+      alert("Request already sent.");
       return;
     }
 
     allRequests.push(newRequest);
     localStorage.setItem('family_requests', JSON.stringify(allRequests));
     
-    alert(`${t('requestSent')}: ${newIc}`);
+    alert(`Request sent to IC: ${newIc}`);
     setNewIc('');
   };
 
@@ -110,21 +110,6 @@ const FamilyDock = () => {
     setRequests(requests.filter(r => r.id !== requestId));
   };
 
-  const handleRemoveMember = (memberToRemove) => {
-    if (!window.confirm(`Are you sure you want to remove ${memberToRemove.name}?`)) return;
-
-    // 1. Remove from my list
-    const myUpdatedMembers = members.filter(m => m.ic !== memberToRemove.ic);
-    setMembers(myUpdatedMembers);
-    localStorage.setItem(`family_members_${currentUser.icNumber}`, JSON.stringify(myUpdatedMembers));
-
-    // 2. Remove me from their list
-    const theirKey = `family_members_${memberToRemove.ic}`;
-    const theirMembers = JSON.parse(localStorage.getItem(theirKey) || '[]');
-    const theirUpdatedMembers = theirMembers.filter(m => m.ic !== currentUser.icNumber);
-    localStorage.setItem(theirKey, JSON.stringify(theirUpdatedMembers));
-  };
-
   return (
     <div className="family-dock-container" style={{ position: 'fixed', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
       
@@ -141,7 +126,7 @@ const FamilyDock = () => {
           animation: 'slideUp 0.3s ease-out'
         }}>
           <div style={{ padding: '15px', backgroundColor: '#2563eb', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>{t('myFamily')}</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>My Family</h3>
             <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
               <X size={20} />
             </button>
@@ -153,7 +138,7 @@ const FamilyDock = () => {
             {requests.length > 0 && (
               <div style={{ marginBottom: '15px' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#ef4444', marginBottom: '8px', paddingLeft: '5px' }}>
-                  {t('pendingRequests')} ({requests.length})
+                  PENDING REQUESTS ({requests.length})
                 </div>
                 {requests.map((req) => (
                   <div key={req.id} style={{ 
@@ -165,7 +150,7 @@ const FamilyDock = () => {
                   }}>
                     <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '4px' }}>{req.fromName}</div>
                     <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '8px' }}>IC: {req.fromIc}</div>
-                    <div style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '10px' }}>{t('wantsToAdd')}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '10px' }}>Is this your family member?</div>
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <button 
                         onClick={() => handleAccept(req)}
@@ -183,7 +168,7 @@ const FamilyDock = () => {
                           gap: '5px'
                         }}
                       >
-                        <Check size={16} /> {t('accept')}
+                        <Check size={16} /> Yes
                       </button>
                       <button 
                         onClick={() => handleReject(req.id)}
@@ -201,7 +186,7 @@ const FamilyDock = () => {
                           gap: '5px'
                         }}
                       >
-                        <X size={16} /> {t('reject')}
+                        <X size={16} /> No
                       </button>
                     </div>
                   </div>
@@ -212,24 +197,17 @@ const FamilyDock = () => {
 
             {/* Family List */}
             {members.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', padding: '20px' }}>{t('noFamilyMembers')}</p>
+              <p style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', padding: '20px' }}>No family members added yet.</p>
             ) : (
               members.map((member, index) => (
                 <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderBottom: '1px solid #f3f4f6' }}>
                   <div style={{ backgroundColor: '#e0f2fe', padding: '8px', borderRadius: '50%', flexShrink: 0 }}>
                     <User size={20} color="#0284c7" />
                   </div>
-                  <div style={{ overflow: 'hidden', flex: 1 }}>
+                  <div style={{ overflow: 'hidden' }}>
                     <div style={{ fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.name}</div>
                     <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{member.ic}</div>
                   </div>
-                  <button 
-                    onClick={() => handleRemoveMember(member)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '5px' }}
-                    title="Remove member"
-                  >
-                    <Trash2 size={18} />
-                  </button>
                 </div>
               ))
             )}
@@ -239,7 +217,7 @@ const FamilyDock = () => {
             <div style={{ display: 'flex', gap: '10px' }}>
               <input 
                 type="text" 
-                placeholder={t('enterIC')}
+                placeholder="Enter IC Number" 
                 value={newIc}
                 onChange={(e) => setNewIc(e.target.value)}
                 style={{ 

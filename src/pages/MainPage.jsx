@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Mic, HeartHandshake, Banknote, Bell, Calendar, Clock, AlertCircle, X } from 'lucide-react';
+import { LogOut, Mic, HeartHandshake, Banknote, Bell, Calendar, Clock, AlertCircle, X, QrCode } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
+import QRCodeModal from '../components/QRCodeModal';
 import { myKasihData } from '../data/mockMyKasihData';
 import { strData } from '../data/mockStrData';
 
@@ -19,7 +20,8 @@ const MainPage = () => {
   const [requests, setRequests] = useState([]);
   const [reminders, setReminders] = useState({ myKasih: null, sara: null, str: null });
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+
   const recognitionRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
 
@@ -63,20 +65,20 @@ const MainPage = () => {
         if (mkDays !== null && mkDays >= 0) {
              newReminders.myKasih = { date: mkData.myKasihExpiry, days: mkDays };
         }
-        
+
         const saraDays = getDaysLeft(mkData.saraNextPayment);
         if (saraDays !== null && saraDays >= 0) {
             newReminders.sara = { date: mkData.saraNextPayment, days: saraDays };
         }
       }
-      
+
       if (sData && sData.eligible && sData.upcoming) {
         // Find future payment
         const nextPayment = sData.upcoming.find(p => {
             const d = getDaysLeft(p.date);
             return d !== null && d >= 0 && (p.status === 'Scheduled' || p.status === 'Pending');
         });
-        
+
         if (nextPayment) {
            newReminders.str = { date: nextPayment.date, days: getDaysLeft(nextPayment.date), amount: nextPayment.amount };
         }
@@ -258,7 +260,7 @@ const MainPage = () => {
       </header>
 
       <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden', position: 'relative' }}>
-        
+
         {/* Sidebar */}
         {isSidebarOpen && (
           <div className="sidebar-panel" style={{
@@ -277,7 +279,7 @@ const MainPage = () => {
             position: 'relative'
           }}>
             {/* Close Button */}
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(false)}
               style={{
                 position: 'absolute',
@@ -320,7 +322,7 @@ const MainPage = () => {
                 <Calendar size={20} color="#2563eb" /> Reminders
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
-                
+
                 {/* MyKasih Expiry */}
                 {reminders.myKasih && (
                   <div style={{ padding: '12px', backgroundColor: '#fff7ed', borderRadius: '10px', border: '1px solid #fed7aa' }}>
@@ -414,16 +416,16 @@ const MainPage = () => {
         width: 'max-content'
       }}>
         {/* Left Button: MyKasih */}
-        <button 
+        <button
           onClick={() => navigate('/mykasih')}
           className="nav-icon-btn"
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             justifyContent: 'flex-end',
-            background: 'none', 
-            border: 'none', 
+            background: 'none',
+            border: 'none',
             color: '#4b5563',
             cursor: 'pointer',
             width: '90px', // Fixed width for symmetry
@@ -489,16 +491,16 @@ const MainPage = () => {
         </div>
 
         {/* Right Button: STR */}
-        <button 
+        <button
           onClick={() => navigate('/str')}
           className="nav-icon-btn"
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             justifyContent: 'flex-end',
-            background: 'none', 
-            border: 'none', 
+            background: 'none',
+            border: 'none',
             color: '#4b5563',
             cursor: 'pointer',
             width: '90px', // Fixed width for symmetry
@@ -514,7 +516,7 @@ const MainPage = () => {
 
       {/* Floating Bell Button (When Sidebar Closed) */}
       {!isSidebarOpen && (
-        <button 
+        <button
           onClick={() => setIsSidebarOpen(true)}
           className="bell-trigger"
           style={{
@@ -553,8 +555,51 @@ const MainPage = () => {
         </button>
       )}
 
+      {/* Floating QR Code Button - Bottom Right */}
+      <button
+        onClick={() => setIsQRModalOpen(true)}
+        style={{
+          position: 'fixed',
+          bottom: '30px',
+          right: '30px',
+          width: '80px',
+          height: '80px',
+          backgroundColor: '#3b82f6',
+          color: 'white',
+          border: '4px solid white',
+          borderRadius: '50%',
+          fontSize: '18px',
+          fontWeight: '600',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 8px 24px rgba(59, 130, 246, 0.5)',
+          transition: 'all 0.3s',
+          zIndex: 100,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.15)';
+          e.currentTarget.style.boxShadow = '0 10px 30px rgba(59, 130, 246, 0.6)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.5)';
+        }}
+        title={t('generateQR')}
+      >
+        <QrCode size={40} />
+      </button>
+
       {/* Family Dock */}
       <FamilyDock />
+
+      {/* QR Code Modal */}
+      <QRCodeModal 
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        userId="USR001"
+      />
 
       <style>{`
         @keyframes slideRight {

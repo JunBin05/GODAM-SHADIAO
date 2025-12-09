@@ -4,12 +4,16 @@ import { ArrowLeft, LogOut, CheckCircle, XCircle, MapPin, ExternalLink, Building
 import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
-import { strData, bsnBranches } from '../data/mockStrData';
+import { useAidPrograms, useStoreLocator } from '../hooks/useAPI';
+import { bsnBranches } from '../data/mockStrData';
 
 const STRPage = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const [userData, setUserData] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const { status: aidStatus, loading, error } = useAidPrograms(userId, currentLanguage);
+  const { stores, findNearbyStores } = useStoreLocator(currentLanguage);
   const [status, setStatus] = useState(null);
 
   useEffect(() => {
@@ -17,17 +21,38 @@ const STRPage = () => {
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setUserData(user);
+      setUserId('USR001'); // In production, get from JWT token or user profile
       
-      // Check eligibility
-      const userStrData = strData[user.icNumber];
-      if (userStrData) {
-        setStatus(userStrData);
-      } else {
-        // Default to not eligible if not in mock data
-        setStatus({ eligible: false });
+      // Get user's location for nearby stores
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            findNearbyStores(position.coords.latitude, position.coords.longitude, 5);
+          },
+          (err) => console.log('Location access denied:', err)
+        );
       }
     }
   }, []);
+
+  useEffect(() => {
+    // Process aid status from API
+    if (aidStatus && aidStatus.data) {
+      const strProgram = aidStatus.data.find(p => p.program_id === 'str');
+      if (strProgram && strProgram.enrollment_status === 'enrolled') {
+        // Mock upcoming payments for enrolled users
+        setStatus({
+          eligible: true,
+          upcoming: [
+            { amount: 'RM 300', phase: 'Phase 2', status: 'Approved', date: '15 Dec 2025' }
+          ],
+          recent: { amount: 'RM 300', phase: 'Phase 1', status: 'Completed', date: '15 Nov 2025' }
+        });
+      } else {
+        setStatus({ eligible: false });
+      }
+    }
+  }, [aidStatus]);
 
   return (
     <div className="page-container">
@@ -100,52 +125,72 @@ const STRPage = () => {
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
             {/* Status Card */}
-            <div style={{ backgroundColor: '#d1fae5', padding: '20px', borderRadius: '15px', border: '1px solid #10b981', display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <CheckCircle size={40} color="#059669" />
+            <div style={{ 
+              backgroundColor: '#f0fdf4', 
+              padding: '30px', 
+              borderRadius: '20px', 
+              border: '1px solid #86efac', 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center', 
+              textAlign: 'center',
+              gap: '15px',
+              boxShadow: '0 4px 15px rgba(22, 163, 74, 0.1)'
+            }}>
+              <div style={{ 
+                backgroundColor: '#dcfce7', 
+                padding: '15px', 
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <CheckCircle size={48} color="#16a34a" />
+              </div>
               <div>
-                <h2 style={{ margin: 0, color: '#065f46', fontSize: '1.5rem' }}>{t('eligibleStr')}</h2>
-                <p style={{ margin: '5px 0 0 0', color: '#047857' }}>{t('applicationApproved')}</p>
+                <h2 style={{ margin: 0, color: '#15803d', fontSize: '2rem', fontWeight: 'bold' }}>{t('eligibleForStr')}</h2>
+                <p style={{ margin: '10px 0 0 0', color: '#166534', fontSize: '1.1rem' }}>
+                  {t('applicationApproved')}
+                </p>
               </div>
             </div>
 
-            {/* Upcoming Payments List */}
+            {/* Upcoming Payments */}
             <div style={{ backgroundColor: 'white', padding: '25px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
               <h3 style={{ marginTop: 0, color: '#4b5563', fontSize: '1.2rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>{t('upcomingPayments')}</h3>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {Array.isArray(status.upcoming) ? status.upcoming.map((payment, index) => (
                   <div key={index} style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '15px',
-                    backgroundColor: index === 0 ? '#eff6ff' : '#f9fafb', // Highlight first one
-                    borderRadius: '12px',
-                    border: index === 0 ? '1px solid #bfdbfe' : '1px solid #f3f4f6'
+                    borderBottom: index !== status.upcoming.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    paddingBottom: index !== status.upcoming.length - 1 ? '20px' : '0'
                   }}>
-                    <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2563eb' }}>{payment.amount}</div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#1f2937' }}>{payment.phase}</div>
-                      <div style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '4px' }}>{t('expected')}: <span style={{ fontWeight: 'bold', color: '#2563eb' }}>{payment.date}</span></div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2563eb' }}>{payment.amount}</div>
-                      <div style={{ 
-                        fontSize: '0.8rem', 
-                        fontWeight: 'bold', 
-                        color: payment.status === 'Scheduled' ? '#059669' : '#d97706',
-                        backgroundColor: payment.status === 'Scheduled' ? '#d1fae5' : '#fef3c7',
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        display: 'inline-block',
-                        marginTop: '4px'
-                      }}>
-                        {payment.status}
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '10px', borderRadius: '8px' }}>
+                      <CheckCircle size={20} />
+                      <span style={{ fontWeight: 'bold' }}>{payment.status}</span>
+                    </div>
+                    <div style={{ marginTop: '10px', color: '#6b7280', fontSize: '0.9rem' }}>
+                      {t('expected')}: {payment.date}
                     </div>
                   </div>
                 )) : (
-                  // Fallback if data structure is old/wrong
-                  <div style={{ color: '#ef4444' }}>Error loading payment schedule.</div>
+                   <div style={{ marginTop: '15px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#2563eb' }}>{status.upcoming.amount}</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#1f2937' }}>{status.upcoming.phase}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '10px', borderRadius: '8px' }}>
+                      <CheckCircle size={20} />
+                      <span style={{ fontWeight: 'bold' }}>{status.upcoming.status}</span>
+                    </div>
+                    <div style={{ marginTop: '10px', color: '#6b7280', fontSize: '0.9rem' }}>
+                      Expected: {status.upcoming.date}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -155,17 +200,15 @@ const STRPage = () => {
               <h3 style={{ marginTop: 0, color: '#4b5563', fontSize: '1.2rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{t('recentPayment')}</h3>
               <div style={{ marginTop: '15px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#1f2937' }}>{status.recent.phase}</div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#059669' }}>{status.recent.amount}</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#1f2937' }}>{status.recent.phase}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#059669', backgroundColor: '#ecfdf5', padding: '10px', borderRadius: '8px' }}>
                   <CheckCircle size={20} />
-                  <span style={{ fontWeight: 'bold' }}>
-                    {t(status.recent.status)} {status.recent.bankDetails}
-                  </span>
+                  <span style={{ fontWeight: 'bold' }}>{status.recent.status}</span>
                 </div>
                 <div style={{ marginTop: '10px', color: '#6b7280', fontSize: '0.9rem' }}>
-                  {t('date')}: {status.recent.date}
+                  Date: {status.recent.date}
                 </div>
               </div>
             </div>
@@ -199,17 +242,34 @@ const STRPage = () => {
                 <XCircle size={48} color="#e11d48" />
               </div>
               <div>
-                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>{t('notEligible')}</h2>
+                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>Not Eligible</h2>
                 <p style={{ margin: '10px 0 0 0', color: '#9f1239', fontSize: '1.1rem' }}>
-                  {t('notEligibleDesc')}
+                  You are currently not registered or eligible for STR.
                 </p>
               </div>
+              <button
+                onClick={() => navigate('/str-apply')}
+                style={{
+                  marginTop: '10px',
+                  padding: '15px 30px',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.3)'
+                }}
+              >
+                Apply for STR Now →
+              </button>
             </div>
 
             {/* BSN Map Section */}
             <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
               <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <MapPin color="#dc2626" /> {t('nearestBsn')}
+                <MapPin color="#dc2626" /> Nearest BSN Branches
               </h3>
               
               {/* Mock Map Visual */}
@@ -228,7 +288,7 @@ const STRPage = () => {
                 overflow: 'hidden'
               }}>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#9ca3af', fontWeight: 'bold' }}>
-                  {t('interactiveMap')}
+                  Interactive Map View
                 </div>
                 {/* Mock Pins */}
                 <MapPin size={32} color="#dc2626" style={{ position: 'absolute', top: '30%', left: '40%' }} />
@@ -244,10 +304,10 @@ const STRPage = () => {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 'bold', color: '#1f2937' }}>{branch.name}</div>
                       <div style={{ fontSize: '0.9rem', color: '#6b7280', margin: '3px 0' }}>{branch.address}</div>
-                      <div style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 'bold' }}>{branch.distance} {t('away')}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 'bold' }}>{branch.distance} away</div>
                     </div>
                     <button style={{ padding: '8px 12px', backgroundColor: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-                      {t('navigate')}
+                      Navigate
                     </button>
                   </div>
                 ))}
@@ -256,9 +316,9 @@ const STRPage = () => {
 
             {/* Registration Guide */}
             <div style={{ backgroundColor: '#eff6ff', padding: '20px', borderRadius: '15px', border: '1px solid #bfdbfe' }}>
-              <h3 style={{ marginTop: 0, color: '#1e40af' }}>{t('howToRegister')}</h3>
+              <h3 style={{ marginTop: 0, color: '#1e40af' }}>How to Register</h3>
               <p style={{ color: '#1e3a8a', marginBottom: '15px' }}>
-                {t('registerInstruction')}
+                You can register for STR through the official MySTR portal.
               </p>
               <a 
                 href="https://bantuantunai.hasil.gov.my/" 
@@ -277,13 +337,49 @@ const STRPage = () => {
                   fontWeight: 'bold'
                 }}
               >
-                {t('goToPortal')} <ExternalLink size={18} />
+                Go to MySTR Portal <ExternalLink size={18} />
               </a>
             </div>
 
           </div>
         )}
       </main>
+
+      {/* Floating Application Button */}
+      {status && status.eligible && (
+        <button
+          onClick={() => navigate('/str-apply')}
+          style={{
+            position: 'fixed',
+            bottom: '100px',
+            right: '30px',
+            backgroundColor: '#2563eb',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50px',
+            padding: '15px 25px',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            boxShadow: '0 8px 20px rgba(37, 99, 235, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            zIndex: 1000,
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'scale(1.05)';
+            e.target.style.boxShadow = '0 12px 30px rgba(37, 99, 235, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'scale(1)';
+            e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)';
+          }}
+        >
+          📝 New Application
+        </button>
+      )}
 
       <FamilyDock />
     </div>

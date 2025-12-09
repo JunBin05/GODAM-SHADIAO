@@ -168,10 +168,12 @@ body {
   font-size: 1.1rem;
   cursor: pointer;
   border-radius: 8px;
+  color: #374151;
 }
 
 .language-option:hover {
   background-color: #f3f4f6;
+  color: #111827;
 }
 
 /* Progress Bar Styles */

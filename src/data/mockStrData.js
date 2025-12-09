@@ -26,8 +26,7 @@ export const strData = {
       phase: "Phase 3 (2025)",
       amount: "RM 300",
       date: "August 2025",
-      status: "depositedStatus",
-      bankDetails: "(Bank Simpanan Nasional - ****1234)"
+      status: "Deposited money into your account (Bank Simpanan Nasional - ****1234)"
     }
   },
   // Not Eligible User
