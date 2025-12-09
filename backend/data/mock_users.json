@@ -17,7 +17,7 @@
       "face_embedding": "face_embed_001_mock",
       "voice_embedding": "voice_embed_001_mock",
       "preferred_language": "ms",
-      "enrolled_programs": ["str", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-01-15"
     },
     {
@@ -37,7 +37,7 @@
       "face_embedding": "face_embed_002_mock",
       "voice_embedding": "voice_embed_002_mock",
       "preferred_language": "ms",
-      "enrolled_programs": ["str", "sara", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-02-20"
     },
     {
@@ -97,7 +97,7 @@
       "face_embedding": "face_embed_005_mock",
       "voice_embedding": "voice_embed_005_mock",
       "preferred_language": "ms",
-      "enrolled_programs": ["str", "sara", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-01-25"
     },
     {
@@ -137,7 +137,7 @@
       "face_embedding": "face_embed_007_mock",
       "voice_embedding": "voice_embed_007_mock",
       "preferred_language": "ms",
-      "enrolled_programs": ["str", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-02-28"
     },
     {
@@ -157,7 +157,7 @@
       "face_embedding": "face_embed_008_mock",
       "voice_embedding": "voice_embed_008_mock",
       "preferred_language": "en",
-      "enrolled_programs": ["str", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-03-18"
     },
     {
@@ -177,7 +177,7 @@
       "face_embedding": "face_embed_009_mock",
       "voice_embedding": "voice_embed_009_mock",
       "preferred_language": "en",
-      "enrolled_programs": ["str", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-04-22"
     },
     {
@@ -217,7 +217,7 @@
       "face_embedding": "face_embed_011_mock",
       "voice_embedding": "voice_embed_011_mock",
       "preferred_language": "en",
-      "enrolled_programs": ["str", "sara", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-01-08"
     },
     {
@@ -237,7 +237,7 @@
       "face_embedding": "face_embed_012_mock",
       "voice_embedding": "voice_embed_012_mock",
       "preferred_language": "ms",
-      "enrolled_programs": ["str", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-06-14"
     },
     {
@@ -277,7 +277,7 @@
       "face_embedding": "face_embed_014_mock",
       "voice_embedding": "voice_embed_014_mock",
       "preferred_language": "ms",
-      "enrolled_programs": ["str", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-03-25"
     },
     {
@@ -297,7 +297,7 @@
       "face_embedding": "face_embed_015_mock",
       "voice_embedding": "voice_embed_015_mock",
       "preferred_language": "en",
-      "enrolled_programs": ["str", "sara", "mykasih"],
+      "enrolled_programs": ["str", "sara"],
       "created_date": "2024-04-17"
     }
   ]

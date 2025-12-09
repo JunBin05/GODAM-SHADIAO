@@ -24,13 +24,27 @@ def load_users() -> list:
 
 
 def load_stores() -> list:
-    """Load stores from mock data"""
+    """Load stores from store_lists.json (real merchant data)"""
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(current_dir, '..', 'data', 'mock_stores.json')
+        data_path = os.path.join(current_dir, '..', 'data', 'store_lists.json')
         with open(data_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            return data.get('stores', [])
+            stores = data.get('data', [])
+            # Normalize field names
+            normalized = []
+            for store in stores:
+                normalized.append({
+                    'store_id': store.get('merchantId', ''),
+                    'name': store.get('tradingName', ''),
+                    'address': f"{store.get('address1', '')} {store.get('address2', '')} {store.get('address3', '')}".strip(),
+                    'latitude': store.get('latitude', 0),
+                    'longitude': store.get('longitude', 0),
+                    'state': store.get('state', ''),
+                    'city': store.get('city', ''),
+                    'type': 'grocery'
+                })
+            return normalized
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
@@ -45,30 +59,8 @@ def get_user_balance(user_id: str, program_id: str) -> Optional[float]:
             if program_id not in user.get('enrolled_programs', []):
                 return None
             
-            # For MyKasih, calculate balance from transactions
-            if program_id == 'mykasih':
-                # Load transaction history
-                try:
-                    current_dir = os.path.dirname(os.path.abspath(__file__))
-                    data_path = os.path.join(current_dir, '..', 'data', 'mock_aid_data.json')
-                    with open(data_path, 'r', encoding='utf-8') as f:
-                        aid_data = json.load(f)
-                        transactions = aid_data.get('transactions', {}).get(user_id, {}).get(program_id, [])
-                        
-                        # Calculate balance: credits - debits
-                        balance = 0
-                        for txn in transactions:
-                            if txn['type'] == 'credit':
-                                balance += txn['amount']
-                            else:
-                                balance -= txn['amount']
-                        
-                        return balance
-                except:
-                    return 200.0  # Default balance
-            
-            # For STR/SARA, return fixed monthly payment amounts
-            elif program_id == 'str':
+            # For STR/SARA, return fixed payment amounts
+            if program_id == 'str':
                 return 300.0  # Fixed STR payment
             elif program_id == 'sara':
                 return 100.0  # Fixed SARA payment

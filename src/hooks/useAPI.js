@@ -168,7 +168,17 @@ export const useAuth = () => {
       setLoading(true);
       setError(null);
       const result = await api.auth.login(username, password);
-      api.saveToken(result.access_token);
+      // Backend returns { token, user_id, name } not { access_token }
+      if (result.token) {
+        api.saveToken(result.token);
+      } else if (result.access_token) {
+        api.saveToken(result.access_token);
+      }
+      // Set user from login response or fetch profile
+      if (result.name && result.user_id) {
+        setUser({ name: result.name, user_id: result.user_id });
+        return result;
+      }
       const profile = await api.auth.getProfile();
       setUser(profile);
       return profile;
@@ -224,7 +234,8 @@ export const useReminders = (userId, lang = 'en') => {
     try {
       setLoading(true);
       const result = await api.reminder.getReminders(userId, lang);
-      setReminders(result.reminders || []);
+      // Backend returns { data: [...] }, frontend expects { reminders: [...] }
+      setReminders(result.data || result.reminders || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -238,7 +249,7 @@ export const useReminders = (userId, lang = 'en') => {
 
   const markAsRead = async (reminderId) => {
     try {
-      await api.reminder.markAsRead(reminderId);
+      await api.reminder.markAsRead(userId, reminderId, lang);
       await fetchReminders(); // Refresh list
     } catch (err) {
       setError(err.message);

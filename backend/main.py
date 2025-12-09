@@ -42,6 +42,46 @@ async def health_check():
         "message": "API is operational"
     }
 
+# Mock user lookup endpoint for testing login
+# Test credentials: IC = "test" or "demo" or any IC from mock_users.json
+@app.get("/user/{ic}")
+async def get_user_by_ic(ic: str):
+    """Get user by IC number for login verification"""
+    import json
+    import os
+    
+    # Mock test users for easy testing
+    test_users = {
+        "test": {"name": "Test User", "icNumber": "test", "language": "en", "hasVoice": True, "hasFace": True},
+        "demo": {"name": "Demo User", "icNumber": "demo", "language": "en", "hasVoice": True, "hasFace": True},
+        "111": {"name": "Ah Gong (Eligible)", "icNumber": "111", "language": "en", "hasVoice": True, "hasFace": True},
+        "222": {"name": "Ah Ma (Not Eligible)", "icNumber": "222", "language": "en", "hasVoice": True, "hasFace": True},
+    }
+    
+    # Check test users first
+    if ic in test_users:
+        return {"success": True, **test_users[ic]}
+    
+    # Check mock_users.json
+    try:
+        data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        with open(os.path.join(data_dir, 'mock_users.json'), 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            for user in data['users']:
+                if user['ic'] == ic or user['user_id'] == ic:
+                    return {
+                        "success": True,
+                        "name": user['name'],
+                        "icNumber": user['ic'],
+                        "language": user.get('preferred_language', 'en'),
+                        "hasVoice": bool(user.get('voice_embedding')),
+                        "hasFace": bool(user.get('face_embedding'))
+                    }
+    except Exception as e:
+        print(f"Error loading mock users: {e}")
+    
+    return {"success": False, "detail": "User not found. Try 'test' or 'demo' for testing."}
+
 # Router registration
 from routes import auth, aid, store, payment, reminder, str_application
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

@@ -4,16 +4,33 @@ from typing import List, Dict, Optional
 from utils.haversine import haversine_distance
 
 def load_stores() -> List[Dict]:
-    """Load stores from mock data file"""
+    """Load stores from store_lists.json (real merchant data)"""
     try:
         # Get the directory where this file is located
         current_dir = os.path.dirname(os.path.abspath(__file__))
         # Navigate to the data directory
-        data_path = os.path.join(current_dir, '..', 'data', 'mock_stores.json')
+        data_path = os.path.join(current_dir, '..', 'data', 'store_lists.json')
         
         with open(data_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            return data.get('stores', [])
+            # store_lists.json uses 'data' key with different structure
+            stores = data.get('data', [])
+            # Normalize field names to match expected format
+            normalized = []
+            for store in stores:
+                normalized.append({
+                    'store_id': store.get('merchantId', ''),
+                    'name': store.get('tradingName', ''),
+                    'address': f"{store.get('address1', '')} {store.get('address2', '')} {store.get('address3', '')}".strip(),
+                    'latitude': store.get('latitude', 0),
+                    'longitude': store.get('longitude', 0),
+                    'state': store.get('state', ''),
+                    'city': store.get('city', ''),
+                    'postal_code': store.get('postalCode', ''),
+                    'type': 'grocery',  # Default type for SARA merchants
+                    'accepted_programs': ['str', 'sara']  # Only 2 programs
+                })
+            return normalized
     except FileNotFoundError as e:
         print(f"Store data file not found: {e}")
         return []
@@ -58,7 +75,7 @@ def find_nearby_stores(
             store_type_value = store.get('type') or store.get('store_type', '')
             
             # All stores accept all programs by default if not specified
-            accepted_programs = store.get('accepted_programs', ['str', 'sara', 'mykasih'])
+            accepted_programs = store.get('accepted_programs', ['str', 'sara'])
             
             # Apply program filter if specified
             if program_id and program_id not in accepted_programs:

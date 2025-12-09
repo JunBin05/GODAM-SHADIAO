@@ -21,7 +21,7 @@ QR_EXPIRY_MINUTES = 5
 
 # API Response Messages
 DEFAULT_LANG = "ms"
-SUPPORTED_LANGUAGES = ["en", "ms"]
+SUPPORTED_LANGUAGES = ["en", "ms", "zh", "ta"]
 
 # Eligibility Thresholds (Based on official government sources 2025)
 # STR 2025 Source: https://www.touchngo.com.my/blog/eligible-sumbangan-tunai-rahmah-str/

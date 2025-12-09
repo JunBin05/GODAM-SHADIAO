@@ -9,7 +9,7 @@ const LanguageToggle = () => {
   const languages = [
     { code: 'en', label: 'English' },
     { code: 'ms', label: 'Bahasa Melayu' },
-    { code: 'zh-cn', label: '简体中文' }, // Simplified Chinese
+    { code: 'zh', label: '中文' }, // Chinese
     { code: 'ta', label: 'தமிழ்' } // Tamil
   ];
 

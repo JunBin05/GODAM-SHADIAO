@@ -49,22 +49,19 @@ const handleResponse = async (response) => {
 
 export const authAPI = {
   /**
-   * Login user
-   * @param {string} username 
-   * @param {string} password 
-   * @returns {Promise<{access_token: string, token_type: string}>}
+   * Login user with user_id and PIN (matches backend)
+   * @param {string} userId - User ID or IC number
+   * @param {string} pin - 6-digit PIN (optional for demo mode)
+   * @returns {Promise<{success: boolean, token: string, user_id: string, name: string}>}
    */
-  login: async (username, password) => {
-    const formData = new URLSearchParams();
-    formData.append('username', username);
-    formData.append('password', password);
-    
+  login: async (userId, pin = '123456') => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData,
+      headers: getHeaders(),
+      body: JSON.stringify({
+        user_id: userId,
+        pin: pin
+      }),
     });
     
     return handleResponse(response);
@@ -308,11 +305,13 @@ export const reminderAPI = {
 
   /**
    * Mark reminder as read
-   * @param {string} reminderId 
+   * @param {string} userId - User ID
+   * @param {string} reminderId - Reminder ID
+   * @param {string} lang - Language code
    */
-  markAsRead: async (reminderId) => {
-    const response = await fetch(`${API_BASE_URL}/reminders/${reminderId}/read`, {
-      method: 'PUT',
+  markAsRead: async (userId, reminderId, lang = 'en') => {
+    const response = await fetch(`${API_BASE_URL}/reminders/${userId}/${reminderId}/mark-read?lang=${lang}`, {
+      method: 'POST',
       headers: getHeaders(true),
     });
     

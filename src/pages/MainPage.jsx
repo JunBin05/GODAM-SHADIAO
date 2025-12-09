@@ -101,8 +101,7 @@ const MainPage = () => {
       const langMap = {
         'en': 'en-US',
         'ms': 'ms-MY',
-        'zh-cn': 'zh-CN',
-        'zh-tw': 'zh-TW',
+        'zh': 'zh-CN',
         'ta': 'ta-IN'
       };
       recognitionRef.current.lang = langMap[language] || 'en-US';
@@ -154,8 +153,7 @@ const MainPage = () => {
     const langMap = {
       'en': 'en-US',
       'ms': 'ms-MY',
-      'zh-cn': 'zh-CN',
-      'zh-tw': 'zh-TW',
+      'zh': 'zh-CN',
       'ta': 'ta-IN'
     };
     utterance.lang = langMap[language] || 'en-US';

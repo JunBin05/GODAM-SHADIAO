@@ -1,4 +1,23 @@
 export const myKasihData = {
+  // Test users for demo
+  "test": {
+    eligible: true,
+    balance: "RM 500.00",
+    myKasihExpiry: "31 Dec 2025",
+    saraBalance: "RM 300.00",
+    saraNextPayment: "01 Jan 2026",
+    lastTransaction: "RM 25.00 at 99 Speedmart",
+    status: "Active"
+  },
+  "demo": {
+    eligible: true,
+    balance: "RM 800.00",
+    myKasihExpiry: "31 Dec 2025",
+    saraBalance: "RM 450.00",
+    saraNextPayment: "15 Dec 2025",
+    lastTransaction: "RM 75.00 at Mydin",
+    status: "Active"
+  },
   // Eligible User (e.g., Ah Gong)
   "111": {
     eligible: true,

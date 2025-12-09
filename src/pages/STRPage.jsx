@@ -4,6 +4,7 @@ import { ArrowLeft, LogOut, CheckCircle, XCircle, MapPin, ExternalLink, Building
 import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
+import StoreMap from '../components/StoreMap';
 import { useAidPrograms, useStoreLocator } from '../hooks/useAPI';
 import { bsnBranches } from '../data/mockStrData';
 
@@ -242,9 +243,9 @@ const STRPage = () => {
                 <XCircle size={48} color="#e11d48" />
               </div>
               <div>
-                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>Not Eligible</h2>
+                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>{t('notEligibleStr')}</h2>
                 <p style={{ margin: '10px 0 0 0', color: '#9f1239', fontSize: '1.1rem' }}>
-                  You are currently not registered or eligible for STR.
+                  {t('notEligibleMsg')}
                 </p>
               </div>
               <button
@@ -262,39 +263,31 @@ const STRPage = () => {
                   boxShadow: '0 4px 10px rgba(37, 99, 235, 0.3)'
                 }}
               >
-                Apply for STR Now →
+                {t('newApplication')} →
               </button>
             </div>
 
             {/* BSN Map Section */}
             <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
               <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <MapPin color="#dc2626" /> Nearest BSN Branches
+                <MapPin color="#dc2626" /> {t('nearestBsnBranches')}
               </h3>
               
-              {/* Mock Map Visual */}
-              <div style={{ 
-                width: '100%', 
-                height: '200px', 
-                backgroundColor: '#e5e7eb', 
-                borderRadius: '10px', 
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundImage: 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
-                backgroundSize: '20px 20px',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#9ca3af', fontWeight: 'bold' }}>
-                  Interactive Map View
-                </div>
-                {/* Mock Pins */}
-                <MapPin size={32} color="#dc2626" style={{ position: 'absolute', top: '30%', left: '40%' }} />
-                <MapPin size={32} color="#dc2626" style={{ position: 'absolute', top: '60%', left: '70%' }} />
-                <div style={{ position: 'absolute', top: '50%', left: '50%', width: '15px', height: '15px', backgroundColor: '#2563eb', borderRadius: '50%', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}></div>
-              </div>
+              {/* Real Map using StoreMap component */}
+              <StoreMap 
+                stores={bsnBranches.map(b => ({
+                  ...b,
+                  latitude: b.lat || 3.139,
+                  longitude: b.lng || 101.6869,
+                  name: b.name,
+                  address: b.address,
+                  distance_km: parseFloat(b.distance) || 1.0
+                }))}
+                userLocation={null}
+                onStoreClick={(branch) => {
+                  window.open(`https://www.google.com/maps/dir/?api=1&destination=${branch.latitude},${branch.longitude}`, '_blank');
+                }}
+              />
 
               {/* Branch List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -307,7 +300,7 @@ const STRPage = () => {
                       <div style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 'bold' }}>{branch.distance} away</div>
                     </div>
                     <button style={{ padding: '8px 12px', backgroundColor: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-                      Navigate
+                      {t('navigate')}
                     </button>
                   </div>
                 ))}
@@ -316,7 +309,7 @@ const STRPage = () => {
 
             {/* Registration Guide */}
             <div style={{ backgroundColor: '#eff6ff', padding: '20px', borderRadius: '15px', border: '1px solid #bfdbfe' }}>
-              <h3 style={{ marginTop: 0, color: '#1e40af' }}>How to Register</h3>
+              <h3 style={{ marginTop: 0, color: '#1e40af' }}>{t('howToRegister')}</h3>
               <p style={{ color: '#1e3a8a', marginBottom: '15px' }}>
                 You can register for STR through the official MySTR portal.
               </p>

@@ -40,18 +40,24 @@ export const bsnBranches = [
     id: 1, 
     name: "BSN KL Main Branch", 
     address: "Wisma BSN, 117, Jalan Ampang, 50450 Kuala Lumpur",
-    distance: "2.5 km"
+    distance: "2.5 km",
+    lat: 3.1579,
+    lng: 101.7149
   },
   { 
     id: 2, 
     name: "BSN Lebuh Ampang", 
     address: "No. 28-30, Lebuh Ampang, 50100 Kuala Lumpur",
-    distance: "3.1 km"
+    distance: "3.1 km",
+    lat: 3.1520,
+    lng: 101.6983
   },
   { 
     id: 3, 
     name: "BSN Chow Kit", 
     address: "No. 389, Jalan Tuanku Abdul Rahman, 50100 Kuala Lumpur",
-    distance: "4.2 km"
+    distance: "4.2 km",
+    lat: 3.1657,
+    lng: 101.6953
   }
 ];

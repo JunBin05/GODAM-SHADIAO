@@ -283,19 +283,19 @@ const SaraPage = () => {
               
               {locationError && (
                 <div style={{ padding: '10px', backgroundColor: '#fef2f2', borderRadius: '8px', marginBottom: '15px', color: '#991b1b' }}>
-                  Location access denied. Showing default area (Kuala Lumpur).
+                  {t('noStoresFound')}
                 </div>
               )}
               
               {storesLoading && (
                 <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
-                  Loading nearby stores...
+                  {t('loadingStores')}
                 </div>
               )}
               
               {storesError && (
                 <div style={{ padding: '15px', backgroundColor: '#fef2f2', borderRadius: '8px', marginBottom: '15px', color: '#991b1b', textAlign: 'center' }}>
-                  ⚠️ Unable to load stores. Please check if backend is running at http://localhost:8000
+                  ⚠️ {t('noStoresFound')}
                 </div>
               )}
               
@@ -495,9 +495,9 @@ const SaraPage = () => {
                 <XCircle size={48} color="#e11d48" />
               </div>
               <div>
-                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>Not Eligible</h2>
+                <h2 style={{ margin: 0, color: '#be123c', fontSize: '2rem', fontWeight: 'bold' }}>{t('notEligible')}</h2>
                 <p style={{ margin: '10px 0 0 0', color: '#9f1239', fontSize: '1.1rem' }}>
-                  You are currently not eligible for SARA aid.
+                  {t('notEligibleSara')}
                 </p>
               </div>
             </div>
@@ -505,31 +505,115 @@ const SaraPage = () => {
             {/* Still show shops? Yes, per request "map of all the shops" */}
             <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
               <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#1f2937' }}>
-                <Store color="#10b981" /> Nearby SARA Merchants
+                <Store color="#10b981" /> {t('nearbySaraMerchants')}
               </h3>
-              <p style={{ color: '#6b7280', marginBottom: '15px' }}>Even if you are not eligible, you can still visit these partner stores.</p>
+              <p style={{ color: '#6b7280', marginBottom: '15px' }}>{t('notEligibleStoreMsg')}</p>
               
-              {/* Mock Map Visual */}
-              <div style={{ 
-                width: '100%', 
-                height: '200px', 
-                backgroundColor: '#e5e7eb', 
-                borderRadius: '10px', 
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundImage: 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
-                backgroundSize: '20px 20px',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#9ca3af', fontWeight: 'bold' }}>
-                  Interactive Map View
+              {storesLoading && (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+                  {t('loadingStores')}
                 </div>
-                <MapPin size={32} color="#2563eb" style={{ position: 'absolute', top: '30%', left: '40%' }} />
-                <MapPin size={32} color="#2563eb" style={{ position: 'absolute', top: '60%', left: '70%' }} />
-              </div>
+              )}
+              
+              {!storesLoading && (
+                <>
+                  <StoreMap 
+                    stores={stores.length > 0 ? stores : mockStores}
+                    userLocation={userLocation}
+                    onStoreClick={(store) => {
+                      window.open(`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`, '_blank');
+                    }}
+                  />
+                  
+                  {/* Shop List for Non-Eligible Users */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '25px' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #e5e7eb'
+                    }}>
+                      <h4 style={{ margin: 0, color: '#1f2937', fontSize: '1.15rem' }}>
+                        📍 {t('nearbyStores')}
+                      </h4>
+                      <span style={{ 
+                        backgroundColor: '#10b981', 
+                        color: 'white', 
+                        padding: '4px 12px', 
+                        borderRadius: '20px', 
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {(stores.length > 0 ? stores : mockStores).length} found
+                      </span>
+                    </div>
+                    {(stores.length > 0 ? stores : mockStores).slice(0, 5).map((shop, index) => (
+                      <div 
+                        key={shop.id || shop.store_id || index} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'flex-start', 
+                          gap: '15px', 
+                          padding: '18px', 
+                          backgroundColor: '#f9fafb', 
+                          borderRadius: '12px',
+                          border: '1px solid #e5e7eb',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          window.open(`https://www.google.com/maps/dir/?api=1&destination=${shop.latitude},${shop.longitude}`, '_blank');
+                        }}
+                      >
+                        <div style={{ 
+                          backgroundColor: '#10b981', 
+                          color: 'white', 
+                          width: '36px', 
+                          height: '36px', 
+                          borderRadius: '10px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          flexShrink: 0
+                        }}>
+                          {index + 1}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 'bold', color: '#1f2937', marginBottom: '4px' }}>
+                            {shop.name || shop.tradingName}
+                          </div>
+                          <div style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                            {shop.address || `${shop.city}, ${shop.state}`}
+                          </div>
+                          {shop.distance && (
+                            <div style={{ 
+                              color: '#10b981', 
+                              fontSize: '0.85rem', 
+                              fontWeight: '600',
+                              marginTop: '4px'
+                            }}>
+                              📍 {shop.distance.toFixed(1)} km away
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ 
+                          backgroundColor: '#ecfdf5', 
+                          color: '#059669', 
+                          padding: '6px 12px', 
+                          borderRadius: '8px', 
+                          fontSize: '0.85rem',
+                          fontWeight: '600',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {t('navigate')} →
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
           </div>
