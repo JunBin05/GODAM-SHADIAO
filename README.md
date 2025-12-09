@@ -182,3 +182,9 @@ This project is developed for educational purposes as part of a hackathon projec
 - [Backend API Documentation](http://localhost:8000/docs)
 - [Enhancement Plan](docs/planning/MAINPAGE_ENHANCEMENT_PLAN.md)
 - [Translation System](docs/guides/TRANSLATION_SYSTEM.md)
+
+---
+
+## 📝 License
+
+MIT
