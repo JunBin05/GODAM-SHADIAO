@@ -57,8 +57,16 @@ const LoginPage = () => {
 
     try {
       // Call backend API to check user in Firebase
-      const response = await fetch(`http://localhost:8000/user/${icInput}`);
+      console.log('[LOGIN] Checking IC:', icInput);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`http://localhost:8000/user/${encodeURIComponent(icInput)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       const result = await response.json();
+      console.log('[LOGIN] IC check result:', result);
 
       if (response.ok && result.success) {
         setUserData({
@@ -84,7 +92,22 @@ const LoginPage = () => {
       }
     } catch (err) {
       console.error('Error checking IC:', err);
-      setError('Server not available. Please try again.');
+      if (err.name === 'AbortError') {
+        setError('Request timeout. Please check if backend is running.');
+      } else {
+        setError('Server not available. Please try again.');
+      }
+      // Fallback to localStorage even on error
+      const storedUser = localStorage.getItem('registeredUser');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        if (user.icNumber === icInput || user.icNumber.includes(icInput)) {
+          setUserData(user);
+          setStep('select-method');
+          setError('');
+          return;
+        }
+      }
     } finally {
       setIsCheckingIC(false);
     }
@@ -97,13 +120,8 @@ const LoginPage = () => {
       // In production, send imageSrc to backend for face recognition
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Attempt real login with IC as username and dummy password
-      // Backend should validate based on biometric data in production
-      try {
-        await login(userData.icNumber, 'demo-password');
-      } catch (err) {
-        console.log('Login API call failed, using local auth:', err);
-      }
+      // Save user data to localStorage for other pages
+      localStorage.setItem('registeredUser', JSON.stringify(userData));
       
       setIsVerifying(false);
       setStep('success');
@@ -132,12 +150,8 @@ const LoginPage = () => {
       setVoiceVerificationResult(result);
       
       if (result.authenticated) {
-        // Attempt real login
-        try {
-          await login(userData.icNumber, 'demo-password');
-        } catch (err) {
-          console.log('Login API call failed, using local auth:', err);
-        }
+        // Save user data to localStorage for other pages
+        localStorage.setItem('registeredUser', JSON.stringify(userData));
         
         // Short delay to show success message
         setTimeout(() => {

@@ -1,7 +1,7 @@
 """
 FastAPI Backend for Voice-Based Speaker Verification
 Uses SpeechBrain ECAPA-TDNN model for speaker embedding extraction
-Integrated with Firebase Firestore (users collection)
+Integrated with MongoDB Atlas (users collection)
 """
 
 # Fix Windows symlink permission issue - MUST be set before importing huggingface_hub
@@ -24,9 +24,8 @@ import soundfile as sf
 from scipy.spatial.distance import cosine
 from speechbrain.inference.speaker import SpeakerRecognition
 
-# Firebase imports
-import firebase_admin
-from firebase_admin import credentials, firestore
+# MongoDB imports
+from services.mongodb_service import save_voice_embedding, load_voice_embedding, get_user_by_id
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -54,40 +53,17 @@ TEMP_DIR.mkdir(exist_ok=True)
 # Cosine similarity threshold for authentication
 SIMILARITY_THRESHOLD = 0.75
 
-# Firebase configuration
-FIREBASE_KEY_PATH = Path(__file__).parent.parent / "serviceAccountKey.json"
-FIREBASE_COLLECTION = "users"  # Consolidated users collection
+# MongoDB configuration (uses connection from mongodb_service.py)
+# No additional initialization needed - mongodb_service handles connection
+
+# In-memory fallback for embeddings (if MongoDB is unavailable)
+EMBEDDINGS_DB = {}
 
 # ============================================================================
-# Initialize Firebase
+# MongoDB Service Integration
 # ============================================================================
-
-db = None
-firebase_initialized = False
-
-def init_firebase():
-    """Initialize Firebase Admin SDK and Firestore."""
-    global db, firebase_initialized
-    try:
-        # Check if already initialized
-        try:
-            firebase_admin.get_app()
-        except ValueError:
-            cred = credentials.Certificate(str(FIREBASE_KEY_PATH))
-            firebase_admin.initialize_app(cred)
-        
-        db = firestore.client()
-        firebase_initialized = True
-        print("✓ Firebase Firestore initialized successfully")
-        print(f"  Using collection: '{FIREBASE_COLLECTION}'")
-        return True
-    except Exception as e:
-        print(f"⚠ Firebase initialization failed: {e}")
-        print("  Voice embeddings will be stored in memory only")
-        return False
-
-# Initialize Firebase at startup
-init_firebase()
+# MongoDB is managed by services/mongodb_service.py
+# Connection string is loaded from .env file
 
 # Fallback in-memory storage
 EMBEDDINGS_DB = {}
@@ -195,193 +171,75 @@ def compute_cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray) ->
 
 def save_embedding(user_id: str, embedding: np.ndarray, name: str = None) -> None:
     """
-    Save voice embedding to Firebase Firestore (users collection).
-    Updates the 'voiceEmbedding' field in the user's document.
+    Save voice embedding to MongoDB (users collection).
     
-    Firebase Structure:
+    MongoDB Structure:
     - Collection: 'users'
-    - Document ID: 'USR001', 'USR002', etc.
-    - Field 'ic': The IC number
+    - Document _id: IC number (e.g., '123456-78-9012')
     - Field 'name': User's name
     - Field 'voiceEmbedding': array of 192 floats
-    
-    If user_id is an IC number, looks up the user document by IC field first.
-    If no user exists with that IC, creates a new USR### document.
     """
     embedding_list = embedding.tolist()
     
-    if firebase_initialized and db:
-        try:
-            doc_id = user_id
-            
-            # If user_id looks like an IC (not USR###), find the user document by IC field
-            if not user_id.startswith('USR'):
-                user_doc = get_user_doc_by_ic(user_id)
-                if user_doc:
-                    doc_id = user_doc[0]  # Use the actual document ID (USR###)
-                    print(f"  Found existing user document: {doc_id} for IC: {user_id}")
-                else:
-                    # No user exists with this IC - create a new USR### document
-                    # Get the next USR number
-                    all_users = db.collection(FIREBASE_COLLECTION).stream()
-                    max_num = 0
-                    for doc in all_users:
-                        if doc.id.startswith('USR'):
-                            try:
-                                num = int(doc.id[3:])
-                                max_num = max(max_num, num)
-                            except:
-                                pass
-                    
-                    new_usr_num = max_num + 1
-                    doc_id = f"USR{new_usr_num:03d}"
-                    
-                    # Create the new user document with required fields only
-                    new_user_data = {
-                        'ic': user_id,
-                        'name': name if name else '',
-                        'voiceEmbedding': embedding_list
-                    }
-                    db.collection(FIREBASE_COLLECTION).document(doc_id).set(new_user_data)
-                    print(f"✓ Created new user document: {doc_id} with IC: {user_id}, Name: {name}")
-                    return
-            
-            # Update existing document with voice embedding (and name if provided)
-            update_data = {'voiceEmbedding': embedding_list}
-            if name:
-                update_data['name'] = name
-            
-            doc_ref = db.collection(FIREBASE_COLLECTION).document(doc_id)
-            doc_ref.set(update_data, merge=True)
-            
-            print(f"✓ Voice embedding saved to Firebase for user: {doc_id}")
-            return
-        except Exception as e:
-            print(f"⚠ Firebase save failed: {e}, falling back to memory")
-    
-    # Fallback to in-memory storage
-    EMBEDDINGS_DB[user_id] = embedding_list
-    print(f"✓ Embedding stored in memory for user: {user_id}")
+    try:
+        # Use MongoDB service to save embedding
+        from services.mongodb_service import save_voice_embedding as mongo_save
+        mongo_save(user_id, embedding_list, name)
+        print(f"✓ Voice embedding saved to MongoDB for user: {user_id}")
+        return
+    except Exception as e:
+        print(f"⚠ MongoDB save failed: {e}, falling back to memory")
+        # Fallback to in-memory storage
+        EMBEDDINGS_DB[user_id] = embedding_list
+        print(f"✓ Embedding stored in memory for user: {user_id}")
 
 
 def load_embedding(user_id: str) -> Optional[np.ndarray]:
     """
-    Load voice embedding from Firebase Firestore (users collection).
-    Reads the 'voiceEmbedding' field from the user's document.
+    Load voice embedding from MongoDB (users collection).
     
-    If user_id is an IC number, looks up the actual user document first.
-    Also checks if there's a document with the IC as document ID (legacy support).
+    Document _id is the IC number directly.
     """
-    if firebase_initialized and db:
-        try:
-            # Try to find user by IC if not a USR### format
-            doc_id = user_id
-            doc_data = None
-            
-            if not user_id.startswith('USR'):
-                user_doc = get_user_doc_by_ic(user_id)
-                if user_doc:
-                    doc_id = user_doc[0]
-                    doc_data = user_doc[1]
-            
-            if doc_data is None:
-                doc_ref = db.collection(FIREBASE_COLLECTION).document(doc_id)
-                doc = doc_ref.get()
-                if doc.exists:
-                    doc_data = doc.to_dict()
-            
-            if doc_data:
-                voice_embedding = doc_data.get('voiceEmbedding')
-                
-                if voice_embedding and len(voice_embedding) > 1:
-                    print(f"✓ Voice embedding loaded from Firebase for user: {doc_id}")
-                    return np.array(voice_embedding)
-                else:
-                    # User exists but no voice embedding - check if there's a legacy document with IC as ID
-                    if not user_id.startswith('USR') and doc_id != user_id:
-                        legacy_doc_ref = db.collection(FIREBASE_COLLECTION).document(user_id)
-                        legacy_doc = legacy_doc_ref.get()
-                        if legacy_doc.exists:
-                            legacy_data = legacy_doc.to_dict()
-                            legacy_embedding = legacy_data.get('voiceEmbedding')
-                            if legacy_embedding and len(legacy_embedding) > 1:
-                                print(f"✓ Voice embedding loaded from legacy document: {user_id}")
-                                # Migrate to the proper user document
-                                db.collection(FIREBASE_COLLECTION).document(doc_id).set({
-                                    'voiceEmbedding': legacy_embedding
-                                }, merge=True)
-                                print(f"  ✓ Migrated voice embedding to user: {doc_id}")
-                                # Delete legacy document
-                                legacy_doc_ref.delete()
-                                print(f"  ✓ Deleted legacy document: {user_id}")
-                                return np.array(legacy_embedding)
-                    print(f"  User {doc_id} exists but has no voice embedding registered")
-                    return None
-            else:
-                # No user found by IC field, try direct document lookup with IC as ID
-                if not user_id.startswith('USR'):
-                    legacy_doc_ref = db.collection(FIREBASE_COLLECTION).document(user_id)
-                    legacy_doc = legacy_doc_ref.get()
-                    if legacy_doc.exists:
-                        legacy_data = legacy_doc.to_dict()
-                        legacy_embedding = legacy_data.get('voiceEmbedding')
-                        if legacy_embedding and len(legacy_embedding) > 1:
-                            print(f"✓ Voice embedding loaded from document ID: {user_id}")
-                            return np.array(legacy_embedding)
-                print(f"  User {user_id} not found in Firebase")
-                return None
-        except Exception as e:
-            print(f"⚠ Firebase load failed: {e}, checking memory")
-    
-    # Fallback to in-memory storage
-    if user_id in EMBEDDINGS_DB:
-        return np.array(EMBEDDINGS_DB[user_id])
-    return None
-    
-    # Fallback to in-memory storage
-    if user_id in EMBEDDINGS_DB:
-        return np.array(EMBEDDINGS_DB[user_id])
-    return None
+    try:
+        # Use MongoDB service to load embedding
+        from services.mongodb_service import load_voice_embedding as mongo_load
+        voice_embedding = mongo_load(user_id)
+        
+        if voice_embedding and len(voice_embedding) > 1:
+            print(f"✓ Voice embedding loaded from MongoDB for user: {user_id}")
+            return np.array(voice_embedding)
+        else:
+            print(f"  User {user_id} exists but has no voice embedding registered")
+            return None
+    except Exception as e:
+        print(f"⚠ MongoDB load failed: {e}, checking memory")
+        # Fallback to in-memory storage
+        if user_id in EMBEDDINGS_DB:
+            return np.array(EMBEDDINGS_DB[user_id])
+        return None
 
 
 def check_user_exists(user_id: str) -> bool:
-    """Check if a user document exists in Firebase."""
-    if firebase_initialized and db:
-        try:
-            # First try direct document lookup
-            doc = db.collection(FIREBASE_COLLECTION).document(user_id).get()
-            if doc.exists:
-                return True
-            # Try lookup by IC field
-            user_doc = get_user_doc_by_ic(user_id)
-            return user_doc is not None
-        except:
-            pass
+    """Check if a user document exists in MongoDB (document _id = IC)."""
+    try:
+        from services.mongodb_service import get_user_by_id
+        user = get_user_by_id(user_id)
+        return user is not None
+    except:
+        pass
     return user_id in EMBEDDINGS_DB
 
 
 def get_user_doc_by_ic(ic_number: str) -> Optional[tuple]:
     """
-    Get user document reference by IC number.
+    Get user document by IC number (IC is the document _id).
     Returns (doc_id, doc_data) or None if not found.
     """
-    if not firebase_initialized or not db:
-        return None
-    
     try:
-        # Clean IC number (remove dashes)
-        clean_ic = ic_number.replace("-", "")
-        
-        # Search by IC field
-        query = db.collection(FIREBASE_COLLECTION).where('ic', '==', ic_number).limit(1).stream()
-        for doc in query:
-            return (doc.id, doc.to_dict())
-        
-        # Also try without dashes
-        query = db.collection(FIREBASE_COLLECTION).where('ic', '==', clean_ic).limit(1).stream()
-        for doc in query:
-            return (doc.id, doc.to_dict())
-        
+        from services.mongodb_service import get_user_by_id
+        user = get_user_by_id(ic_number)
+        if user:
+            return (ic_number, user)
         return None
     except Exception as e:
         print(f"Error looking up user by IC: {e}")

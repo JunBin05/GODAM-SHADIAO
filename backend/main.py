@@ -43,44 +43,37 @@ async def health_check():
         "model_loaded": True  # For voice login compatibility
     }
 
-# Mock user lookup endpoint for testing login
-# Test credentials: IC = "test" or "demo" or any IC from Firebase
+# User lookup endpoint - IC is the document ID
 @app.get("/user/{ic}")
 async def get_user_by_ic(ic: str):
-    """Get user by IC number for login verification"""
-    # Import Firebase service
-    from services.firebase_service import get_user_by_ic as firebase_get_user_by_ic, get_user_by_id
+    """Get user by IC number (IC is the document ID in MongoDB)"""
+    from services.mongodb_service import get_user_by_id
     
     # Mock test users for easy testing (fallback)
     test_users = {
         "test": {"name": "Test User", "icNumber": "test", "language": "en", "hasVoice": True, "hasFace": True},
         "demo": {"name": "Demo User", "icNumber": "demo", "language": "en", "hasVoice": True, "hasFace": True},
-        "111": {"name": "Ah Gong (Eligible)", "icNumber": "111", "language": "en", "hasVoice": True, "hasFace": True},
-        "222": {"name": "Ah Ma (Not Eligible)", "icNumber": "222", "language": "en", "hasVoice": True, "hasFace": True},
     }
     
     # Check test users first
     if ic in test_users:
         return {"success": True, **test_users[ic]}
     
-    # Check Firebase
+    # Check MongoDB - IC is the _id
     try:
-        user = firebase_get_user_by_ic(ic)
-        if not user:
-            # Also try by user_id
-            user = get_user_by_id(ic)
+        user = get_user_by_id(ic)
         
         if user:
             return {
                 "success": True,
                 "name": user.get('name', ''),
-                "icNumber": user.get('ic', ''),
+                "icNumber": ic,
                 "language": user.get('preferred_language', 'en'),
-                "hasVoice": bool(user.get('voice_embedding')),
+                "hasVoice": bool(user.get('voiceEmbedding')),
                 "hasFace": bool(user.get('face_embedding'))
             }
     except Exception as e:
-        print(f"Error loading user from Firebase: {e}")
+        print(f"Error loading user from MongoDB: {e}")
     
     return {"success": False, "detail": "User not found. Try 'test' or 'demo' for testing."}
 
@@ -88,8 +81,8 @@ async def get_user_by_ic(ic: str):
 # Simple user registration endpoint for frontend
 @app.post("/user/register")
 async def simple_register(request: dict):
-    """Simple registration endpoint for frontend"""
-    from services.firebase_service import get_user_by_ic, create_user, get_all_users
+    """Simple registration endpoint for frontend - uses IC as document ID in MongoDB"""
+    from services.mongodb_service import get_user_by_id, create_user, update_user
     
     ic_number = request.get('icNumber', '')
     name = request.get('name', '')
@@ -100,66 +93,104 @@ async def simple_register(request: dict):
     if not ic_number:
         return {"success": False, "detail": "IC number is required"}
     
-    # Check if user already exists
-    existing_user = get_user_by_ic(ic_number)
-    if existing_user:
-        return {"success": False, "detail": "User with this IC already exists"}
-    
-    # Generate new user_id
-    users = get_all_users()
-    max_user_num = 0
-    for user in users:
-        try:
-            user_num = int(user.get('user_id', 'USR000').replace('USR', ''))
-            max_user_num = max(max_user_num, user_num)
-        except (ValueError, KeyError):
-            continue
-    
-    new_user_id = f"USR{str(max_user_num + 1).zfill(3)}"
-    
-    # Create new user
-    new_user = {
-        "user_id": new_user_id,
-        "name": name or f"User {new_user_id}",
-        "ic": ic_number,
-        "age": 0,  # Will be calculated from IC
-        "phone": "",
-        "email": "",
-        "monthly_income": 0,
-        "household_size": 1,
-        "state": "",
-        "disability_status": False,
-        "employment_status": "unknown",
-        "dependents": 0,
-        "pin": "123456",  # Default PIN
-        "face_embedding": str(face_embedding) if face_embedding else None,
-        "voice_embedding": str(voice_embedding) if voice_embedding else None,
-        "preferred_language": language,
-        "enrolled_programs": [],
-        "created_date": "2024-12-09"
-    }
-    
+    # Check if user already exists (IC is the _id)
     try:
-        create_user(new_user)
-        return {
-            "success": True,
-            "message": "Registration successful",
-            "user_id": new_user_id,
-            "name": new_user['name']
-        }
+        user = get_user_by_id(ic_number)
+        
+        if user:
+            # Update existing user
+            update_data = {}
+            if name:
+                update_data['name'] = name
+            if language:
+                update_data['preferred_language'] = language
+            if face_embedding:
+                update_data['face_embedding'] = face_embedding
+            if voice_embedding:
+                update_data['voiceEmbedding'] = voice_embedding
+            
+            if update_data:
+                update_user(ic_number, update_data)
+            
+            return {
+                "success": True,
+                "message": "User updated",
+                "user_id": ic_number,
+                "name": name
+            }
+        else:
+            # Create new user with IC as _id
+            new_user = {
+                "_id": ic_number,
+                "name": name or "New User",
+                "preferred_language": language,
+                "face_embedding": face_embedding if face_embedding else None,
+                "voiceEmbedding": voice_embedding if voice_embedding else None,
+                "created_date": "2024-12-10"
+            }
+            
+            create_user(new_user)
+            return {
+                "success": True,
+                "message": "Registration successful",
+                "user_id": ic_number,
+                "name": new_user['name']
+            }
     except Exception as e:
-        print(f"Error creating user: {e}")
+        print(f"Error in registration: {e}")
         return {"success": False, "detail": str(e)}
 
 
-# Router registration
-from routes import auth, aid, store, payment, reminder, str_application
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(aid.router, prefix="/api/aid", tags=["Aid Programs"])
-app.include_router(store.router, prefix="/api/stores", tags=["Store Locator"])
-app.include_router(payment.router, prefix="/api/payment", tags=["QR Payment"])
-app.include_router(reminder.router, prefix="/api/reminders", tags=["Reminders & Notifications"])
-app.include_router(str_application.router, prefix="/api/str-application", tags=["STR Application Helper"])
+# Financial Aid Eligibility endpoint - fetches from Firebase financialAid collection
+@app.get("/api/financial-aid/{ic}")
+async def get_financial_aid(ic: str):
+    """Get financial aid eligibility from MongoDB financialAid collection"""
+    from services.mongodb_service import get_financial_aid as get_financial_aid_data
+    
+    try:
+        data = get_financial_aid_data(ic)
+        
+        if data:
+            return {
+                "success": True,
+                "ic": ic,
+                "mykasih_eligible": data.get('mykasih_eligible', False),
+                "str_eligible": data.get('str_eligible', False),
+                "mykasih_balance": data.get('mykasih_balance_not_expire', 0),
+                "mykasih_expire_balance": data.get('mykasih_expire__balance', 0),
+                "mykasih_start_date": str(data.get('mykasih_start_date', '')),
+                "mykasih_expire_date": str(data.get('mykasih_expire_date', '')),
+                "mykasih_history": data.get('mykasih_history', []),
+                "str_next_pay_date": str(data.get('str_nextPayDate', '')),
+                "str_next_pay_amount": data.get('str_nextPayAmount', 0),
+                "str_remaining_cycles": data.get('str_remainingCycles', 0),
+                "str_history": data.get('str_history', [])
+            }
+        else:
+            return {
+                "success": True,
+                "ic": ic,
+                "mykasih_eligible": False,
+                "str_eligible": False
+            }
+    except Exception as e:
+        print(f"Error fetching financial aid: {e}")
+        return {"success": False, "detail": str(e)}
+
+
+# Router registration - DISABLED: These still use Firebase which is exhausted
+# TODO: Update these services to use MongoDB
+# try:
+#     from routes import auth, aid, store, payment, reminder, str_application
+#     app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+#     app.include_router(aid.router, prefix="/api/aid", tags=["Aid Programs"])
+#     app.include_router(store.router, prefix="/api/stores", tags=["Store Locator"])
+#     app.include_router(payment.router, prefix="/api/payment", tags=["QR Payment"])
+#     app.include_router(reminder.router, prefix="/api/reminders", tags=["Reminders & Notifications"])
+#     app.include_router(str_application.router, prefix="/api/str-application", tags=["STR Application Helper"])
+#     print("✓ Additional routes loaded")
+# except Exception as e:
+#     print(f"⚠ Additional routes not loaded: {e}")
 
 # Mount voice login routes from load_VoiceLogin_Model
 try:

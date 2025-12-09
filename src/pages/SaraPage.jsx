@@ -6,7 +6,7 @@ import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
 import StoreMap from '../components/StoreMap';
 import { useStoreLocator } from '../hooks/useAPI';
-import { myKasihData, myKasihShops } from '../data/mockMyKasihData';
+import { myKasihShops } from '../data/mockMyKasihData';
 
 const SaraPage = () => {
   const navigate = useNavigate();
@@ -16,6 +16,7 @@ const SaraPage = () => {
   const [showQR, setShowQR] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   const { stores, loading: storesLoading, error: storesError, findNearbyStores } = useStoreLocator(language);
   
@@ -23,18 +24,17 @@ const SaraPage = () => {
   const mockStores = myKasihShops || [];
 
   useEffect(() => {
+    // Reset loading state on mount
+    setLoading(true);
+    setStatus(null);
+    
     const storedUser = localStorage.getItem('registeredUser');
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setUserData(user);
       
-      // Check eligibility
-      const userMyKasihData = myKasihData[user.icNumber];
-      if (userMyKasihData) {
-        setStatus(userMyKasihData);
-      } else {
-        setStatus({ eligible: false });
-      }
+      // Fetch eligibility from Firebase via backend
+      fetchEligibility(user.icNumber);
     }
     
     // Get user's location
@@ -60,6 +60,43 @@ const SaraPage = () => {
       );
     }
   }, []);
+
+  const fetchEligibility = async (icNumber) => {
+    try {
+      setLoading(true);
+      console.log('[SARA] Fetching eligibility for IC:', icNumber);
+      const url = `http://localhost:8000/api/financial-aid/${encodeURIComponent(icNumber)}`;
+      console.log('[SARA] Fetch URL:', url);
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log('[SARA] API Response:', data);
+      
+      if (data.success && data.mykasih_eligible) {
+        // Format dates for display
+        const expireDate = data.mykasih_expire_date ? new Date(data.mykasih_expire_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+        const lastTransaction = data.mykasih_history && data.mykasih_history.length > 0 
+          ? data.mykasih_history[data.mykasih_history.length - 1].date 
+          : 'No transactions';
+        
+        setStatus({
+          eligible: true,
+          balance: `RM ${data.mykasih_expire_balance || 0}`,
+          saraBalance: `RM ${data.mykasih_balance || 0}`,
+          lastTransaction: lastTransaction,
+          expireDate: expireDate,
+          saraNextPayment: expireDate,
+          history: data.mykasih_history || []
+        });
+      } else {
+        setStatus({ eligible: false });
+      }
+    } catch (error) {
+      console.error('Error fetching MyKasih eligibility:', error);
+      setStatus({ eligible: false });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="page-container" style={{ backgroundColor: '#f3f4f6' }}>
@@ -127,7 +164,12 @@ const SaraPage = () => {
       <main className="page-content" style={{ justifyContent: 'flex-start', paddingTop: '30px', paddingBottom: '100px', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
         <h1 style={{ fontSize: '2.5rem', color: '#2563eb', marginTop: '0', marginBottom: '30px' }}>{t('sara')}</h1>
         
-        {status && status.eligible ? (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '50px', color: '#6b7280' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>⏳</div>
+            <div>Loading eligibility status...</div>
+          </div>
+        ) : status && status.eligible ? (
           // Eligible View
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '25px' }}>
             

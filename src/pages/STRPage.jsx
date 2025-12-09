@@ -5,24 +5,29 @@ import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
 import StoreMap from '../components/StoreMap';
-import { useAidPrograms, useStoreLocator } from '../hooks/useAPI';
+import { useStoreLocator } from '../hooks/useAPI';
 import { bsnBranches } from '../data/mockStrData';
 
 const STRPage = () => {
   const navigate = useNavigate();
   const { t, currentLanguage } = useLanguage();
   const [userData, setUserData] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const { status: aidStatus, loading, error } = useAidPrograms(userId, currentLanguage);
   const { stores, findNearbyStores } = useStoreLocator(currentLanguage);
   const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Reset loading state on mount
+    setLoading(true);
+    setStatus(null);
+    
     const storedUser = localStorage.getItem('registeredUser');
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setUserData(user);
-      setUserId('USR001'); // In production, get from JWT token or user profile
+      
+      // Fetch eligibility from Firebase via backend
+      fetchEligibility(user.icNumber);
       
       // Get user's location for nearby stores
       if (navigator.geolocation) {
@@ -36,24 +41,46 @@ const STRPage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    // Process aid status from API
-    if (aidStatus && aidStatus.data) {
-      const strProgram = aidStatus.data.find(p => p.program_id === 'str');
-      if (strProgram && strProgram.enrollment_status === 'enrolled') {
-        // Mock upcoming payments for enrolled users
+  const fetchEligibility = async (icNumber) => {
+    try {
+      setLoading(true);
+      console.log('[STR] Fetching eligibility for IC:', icNumber);
+      const url = `http://localhost:8000/api/financial-aid/${encodeURIComponent(icNumber)}`;
+      console.log('[STR] Fetch URL:', url);
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log('[STR] API Response:', data);
+      
+      if (data.success && data.str_eligible) {
+        // Format the date for display
+        const nextPayDate = data.str_next_pay_date ? new Date(data.str_next_pay_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBA';
+        
         setStatus({
           eligible: true,
-          upcoming: [
-            { amount: 'RM 300', phase: 'Phase 2', status: 'Approved', date: '15 Dec 2025' }
-          ],
-          recent: { amount: 'RM 300', phase: 'Phase 1', status: 'Completed', date: '15 Nov 2025' }
+          upcoming: [{
+            amount: `RM ${data.str_next_pay_amount || 0}`,
+            phase: `Remaining: ${data.str_remaining_cycles || 0} cycles`,
+            status: 'Approved',
+            date: nextPayDate
+          }],
+          recent: data.str_history && data.str_history.length > 0 ? {
+            amount: `RM ${data.str_history[0].amount}`,
+            phase: 'Previous Payment',
+            status: data.str_history[0].status || 'Completed',
+            date: data.str_history[0].date
+          } : null,
+          history: data.str_history || []
         });
       } else {
         setStatus({ eligible: false });
       }
+    } catch (error) {
+      console.error('Error fetching STR eligibility:', error);
+      setStatus({ eligible: false });
+    } finally {
+      setLoading(false);
     }
-  }, [aidStatus]);
+  };
 
   return (
     <div className="page-container">
@@ -121,7 +148,12 @@ const STRPage = () => {
       <main className="page-content" style={{ justifyContent: 'flex-start', paddingTop: '30px', paddingBottom: '100px', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
         <h1 style={{ fontSize: '2.5rem', color: '#2563eb', marginTop: '0', marginBottom: '30px' }}>{t('str')}</h1>
         
-        {status && status.eligible ? (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '50px', color: '#6b7280' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>⏳</div>
+            <div>Loading eligibility status...</div>
+          </div>
+        ) : status && status.eligible ? (
           // Eligible View
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
