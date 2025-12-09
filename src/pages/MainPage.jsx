@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Mic, HeartHandshake, Banknote, QrCode } from 'lucide-react';
+import { LogOut, Mic, HeartHandshake, Banknote, Bell, Calendar, Clock, AlertCircle, X, QrCode } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 import FamilyDock from '../components/FamilyDock';
-import StatusCard from '../components/StatusCard';
-import ReminderWidget from '../components/ReminderWidget';
 import QRCodeModal from '../components/QRCodeModal';
-import { useAidPrograms, useReminders } from '../hooks/useAPI';
+import { myKasihData } from '../data/mockMyKasihData';
+import { strData } from '../data/mockStrData';
 
 const MainPage = () => {
   const navigate = useNavigate();
@@ -18,67 +17,77 @@ const MainPage = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [reminders, setReminders] = useState({ myKasih: null, sara: null, str: null });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
-  
+
   const recognitionRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
-  const { status: aidStatus, loading: aidLoading } = useAidPrograms(userId, language);
-  const { reminders, loading: remindersLoading } = useReminders(userId, language);
 
-  // Mock reminders for demonstration (remove when backend is ready)
-  const mockReminders = [
-    {
-      id: 'REM001',
-      title: 'STR Payment Incoming',
-      message: 'Your STR monthly payment of RM 350 will be deposited to your bank account soon.',
-      category: 'payment',
-      priority: 'high',
-      due_date: '2025-12-15T00:00:00'
-    },
-    {
-      id: 'REM002',
-      title: 'Document Renewal Required',
-      message: 'Your MyKad needs to be renewed. Please visit the nearest JPN branch.',
-      category: 'document',
-      priority: 'medium',
-      due_date: '2025-12-20T00:00:00'
-    },
-    {
-      id: 'REM003',
-      title: 'BSN Branch Appointment',
-      message: 'Your appointment at BSN Kuala Lumpur branch is scheduled.',
-      category: 'appointment',
-      priority: 'medium',
-      due_date: '2025-12-10T10:00:00'
-    },
-    {
-      id: 'REM004',
-      title: 'SARA Balance Expiring',
-      message: 'You have RM 50 in SARA balance that will expire at the end of the month.',
-      category: 'payment',
-      priority: 'medium',
-      due_date: '2025-12-31T00:00:00'
+  // Helper for days left
+  const getDaysLeft = (dateString) => {
+    if (!dateString) return null;
+    let targetDate = new Date(dateString);
+    if (isNaN(targetDate.getTime())) {
+       // Try appending " 1" for "Month Year" format (e.g. "November 2025")
+       targetDate = new Date("1 " + dateString);
     }
-  ];
-
-  // Use mock reminders if no real reminders available
-  const displayReminders = reminders && reminders.length > 0 ? reminders : mockReminders;
+    if (isNaN(targetDate.getTime())) return null;
+    
+    const today = new Date();
+    const diffTime = targetDate - today;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('registeredUser');
     if (storedUser) {
-      setUserData(JSON.parse(storedUser));
-      setUserId('USR001'); // In production, get from JWT token
+      const user = JSON.parse(storedUser);
+      setUserData(user);
+
+      // Load Requests
+      const loadRequests = () => {
+        const allRequests = JSON.parse(localStorage.getItem('family_requests') || '[]');
+        const myRequests = allRequests.filter(req => req.toIc === user.icNumber && req.status === 'pending');
+        setRequests(myRequests);
+      };
+      loadRequests();
+      const interval = setInterval(loadRequests, 2000);
+
+      // Load Reminders
+      const mkData = myKasihData[user.icNumber];
+      const sData = strData[user.icNumber];
+      const newReminders = {};
+
+      if (mkData && mkData.eligible) {
+        const mkDays = getDaysLeft(mkData.myKasihExpiry);
+        if (mkDays !== null && mkDays >= 0) {
+             newReminders.myKasih = { date: mkData.myKasihExpiry, days: mkDays };
+        }
+
+        const saraDays = getDaysLeft(mkData.saraNextPayment);
+        if (saraDays !== null && saraDays >= 0) {
+            newReminders.sara = { date: mkData.saraNextPayment, days: saraDays };
+        }
+      }
+
+      if (sData && sData.eligible && sData.upcoming) {
+        // Find future payment
+        const nextPayment = sData.upcoming.find(p => {
+            const d = getDaysLeft(p.date);
+            return d !== null && d >= 0 && (p.status === 'Scheduled' || p.status === 'Pending');
+        });
+
+        if (nextPayment) {
+           newReminders.str = { date: nextPayment.date, days: getDaysLeft(nextPayment.date), amount: nextPayment.amount };
+        }
+      }
+      setReminders(newReminders);
+
+      return () => clearInterval(interval);
     }
   }, []);
-
-  // Log aid status when available
-  useEffect(() => {
-    if (aidStatus) {
-      console.log('User aid programs:', aidStatus);
-    }
-  }, [aidStatus]);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -116,58 +125,18 @@ const MainPage = () => {
   }, [language]);
 
   const handleAIResponse = (text) => {
-    // AI Logic with intent detection
+    // Mock AI Logic
     let response = "";
     const lowerText = text.toLowerCase();
 
-    // NOTE: Your teammate will replace this with real AI voice assistant
-    // For now, simple keyword detection for navigation
-    
-    // STR Application Intent
-    if (lowerText.includes('apply for str') || lowerText.includes('apply str') || lowerText.includes('str application')) {
-      response = "Opening STR application form for you.";
-      setAiResponse(response);
-      speak(response);
-      setTimeout(() => navigate('/str-apply'), 1500);
-      return;
-    }
-    
-    // STR Status Check
-    if (lowerText.includes('str status') || lowerText.includes('str check') || lowerText.includes('my str')) {
-      response = "Checking your STR status.";
-      setAiResponse(response);
-      speak(response);
-      setTimeout(() => navigate('/str'), 1500);
-      return;
-    }
-
-    // SARA Intent
-    if (lowerText.includes('sara') || lowerText.includes('asas rahmah')) {
-      response = "Opening SARA page.";
-      setAiResponse(response);
-      speak(response);
-      setTimeout(() => navigate('/sara'), 1500);
-      return;
-    }
-
-    // Money/Payment Queries
-    if (lowerText.includes('money') || lowerText.includes('duit') || lowerText.includes('wang') || lowerText.includes('cash') || lowerText.includes('payment')) {
-      if (aidStatus && aidStatus.data) {
-        const strProgram = aidStatus.data.find(p => p.program_id === 'str');
-        if (strProgram && strProgram.enrollment_status === 'enrolled') {
-          response = "You are enrolled in STR! You can check your payment status and next payments on the STR page.";
-        } else {
-          response = "You are not currently enrolled in STR. Would you like to apply? Just say 'apply for STR'.";
-        }
-      } else {
-        response = "You can check your STR status by clicking the button on the right.";
-      }
+    if (lowerText.includes('money') || lowerText.includes('duit') || lowerText.includes('wang') || lowerText.includes('cash')) {
+      response = t('aiCheckStr');
     } else if (lowerText.includes('help') || lowerText.includes('tolong') || lowerText.includes('bantu')) {
-      response = "I am here to help. Press and hold the mic button to ask about SARA, STR, or say 'apply for STR' to start an application.";
+      response = t('aiHelp');
     } else if (lowerText.includes('register') || lowerText.includes('daftar')) {
-      response = "You are already registered and logged in.";
+      response = t('aiRegistered');
     } else {
-      response = `I heard you say: "${text}". How can I help you with SARA or STR? You can say 'apply for STR' to start an application.`;
+      response = t('aiDefault').replace('{text}', text);
     }
 
     setAiResponse(response);
@@ -242,7 +211,7 @@ const MainPage = () => {
   return (
     <div className="page-container main-page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Header */}
-      <header className="landing-header" style={{ flexShrink: 0, position: 'relative' }}>
+      <header className="landing-header" style={{ flexShrink: 0, position: 'relative', zIndex: 60 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <div className="logo-placeholder">{t('appTitle')}</div>
           <div style={{ width: '3px', height: '40px', backgroundColor: '#9ca3af' }}></div>
@@ -260,7 +229,7 @@ const MainPage = () => {
             textAlign: 'center',
             width: 'max-content',
             gap: '20px',
-            pointerEvents: 'none' // Prevent blocking clicks if it overlaps (though it shouldn't)
+            pointerEvents: 'none'
           }}>
             <span style={{ fontWeight: 'bold', color: 'black', fontSize: '1.5rem' }}>{userData.name}</span>
             <span style={{ fontWeight: 'bold', color: 'black', fontSize: '1.5rem' }}>{userData.icNumber}</span>
@@ -290,69 +259,301 @@ const MainPage = () => {
         </div>
       </header>
 
-      {/* Main Content (Chat Area) */}
-      <main style={{ flexGrow: 1, padding: '20px', paddingBottom: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Status Cards Section */}
-        <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ 
-            fontSize: '20px', 
-            fontWeight: '600', 
-            color: '#374151', 
-            marginBottom: '16px',
+      <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden', position: 'relative' }}>
+
+        {/* Sidebar */}
+        {isSidebarOpen && (
+          <div className="sidebar-panel" style={{
+            width: '300px',
+            backgroundColor: 'white',
+            borderRight: '1px solid #e5e7eb',
+            padding: '20px',
             display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+            flexDirection: 'column',
+            gap: '25px',
+            overflowY: 'auto',
+            flexShrink: 0,
+            animation: 'slideRight 0.5s ease-out',
+            zIndex: 50,
+            boxShadow: '2px 0 10px rgba(0,0,0,0.05)',
+            position: 'relative'
           }}>
-            {t('quickOverview')}
-          </h2>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-            gap: '20px',
-            marginBottom: '20px'
-          }}>
-            <StatusCard 
-              program={aidStatus?.data?.find(p => p.program_id === 'str')}
-              icon={<Banknote size={32} />}
-              onClick={() => navigate('/str')}
-              type="str"
-            />
-            <StatusCard 
-              program={aidStatus?.data?.find(p => p.program_id === 'sara')}
-              icon={<HeartHandshake size={32} />}
-              onClick={() => navigate('/sara')}
-              type="sara"
-            />
+            {/* Close Button */}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#9ca3af'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            {/* Notifications Section */}
+            <div>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1f2937', marginTop: 0 }}>
+                <Bell size={20} color="#ef4444" /> Notifications
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                {requests.length > 0 ? (
+                  requests.map(req => (
+                    <div key={req.id} style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{req.fromName}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>wants to add you as family.</div>
+                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '5px', fontWeight: 'bold' }}>Check Family Dock</div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.9rem' }}>No new notifications</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ height: '1px', backgroundColor: '#e5e7eb' }}></div>
+
+            {/* Reminders Section */}
+            <div>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1f2937', marginTop: 0 }}>
+                <Calendar size={20} color="#2563eb" /> Reminders
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
+
+                {/* MyKasih Expiry */}
+                {reminders.myKasih && (
+                  <div style={{ padding: '12px', backgroundColor: '#fff7ed', borderRadius: '10px', border: '1px solid #fed7aa' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <Clock size={16} color="#ea580c" />
+                      <span style={{ fontWeight: 'bold', color: '#9a3412', fontSize: '0.9rem' }}>MyKasih Expiry</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#c2410c' }}>
+                      {reminders.myKasih.days} days left
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#9a3412' }}>Due: {reminders.myKasih.date}</div>
+                  </div>
+                )}
+
+                {/* SARA Payment */}
+                {reminders.sara && (
+                  <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <Banknote size={16} color="#16a34a" />
+                      <span style={{ fontWeight: 'bold', color: '#166534', fontSize: '0.9rem' }}>Next SARA</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#15803d' }}>
+                      {reminders.sara.days} days left
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#166534' }}>Date: {reminders.sara.date}</div>
+                  </div>
+                )}
+
+                {/* STR Payment */}
+                {reminders.str && (
+                  <div style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <Banknote size={16} color="#2563eb" />
+                      <span style={{ fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}>Next STR ({reminders.str.amount})</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#1d4ed8' }}>
+                      {reminders.str.days} days left
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#1e40af' }}>Expected: {reminders.str.date}</div>
+                  </div>
+                )}
+
+                {!reminders.myKasih && !reminders.sara && !reminders.str && (
+                   <div style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.9rem' }}>No upcoming reminders</div>
+                )}
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* Main Content (Chat Area) */}
+        <main style={{ flexGrow: 1, padding: '20px', paddingBottom: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Welcome Message */}
+          {!transcript && !aiResponse && (
+            <div style={{ textAlign: 'center', marginTop: '50px', color: '#6b7280' }}>
+              <p style={{ fontSize: '1.5rem' }}>{t('mainWelcome')}</p>
+            </div>
+          )}
+
+          {/* User Transcript */}
+          {transcript && (
+            <div style={{ alignSelf: 'flex-end', backgroundColor: '#dbeafe', padding: '15px', borderRadius: '15px 15px 0 15px', maxWidth: '80%' }}>
+              <p style={{ margin: 0, color: '#1e40af' }}>{transcript}</p>
+            </div>
+          )}
+
+          {/* AI Response */}
+          {aiResponse && (
+            <div style={{ alignSelf: 'flex-start', backgroundColor: '#f3f4f6', padding: '15px', borderRadius: '15px 15px 15px 0', maxWidth: '80%', border: '1px solid #e5e7eb' }}>
+              <p style={{ margin: 0, color: '#374151' }}>{aiResponse}</p>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Floating Bottom Dock */}
+      <div style={{ 
+        position: 'fixed',
+        bottom: '30px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: 'white',
+        borderRadius: '50px', // Bubble shape
+        padding: '10px 20px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)', // Floating shadow
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '10px', // Close to mic
+        zIndex: 100,
+        width: 'max-content'
+      }}>
+        {/* Left Button: MyKasih */}
+        <button
+          onClick={() => navigate('/mykasih')}
+          className="nav-icon-btn"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            background: 'none',
+            border: 'none',
+            color: '#4b5563',
+            cursor: 'pointer',
+            width: '90px', // Fixed width for symmetry
+            textAlign: 'center'
+          }}
+        >
+          <div style={{ backgroundColor: '#fce7f3', padding: '12px', borderRadius: '50%', marginBottom: '5px' }}>
+            <HeartHandshake size={28} color="#ec4899" />
+          </div>
+          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', lineHeight: '1.2' }}>{t('myKasih')}</span>
+        </button>
+
+        {/* Center: Huge Mic Button */}
+        <div style={{ position: 'relative', margin: '0 10px' }}>
+          {/* Label above mic */}
+          <p style={{ 
+            position: 'absolute',
+            top: '-60px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'max-content',
+            fontSize: '0.9rem', 
+            color: '#6b7280', 
+            fontWeight: '600',
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            padding: '6px 12px',
+            borderRadius: '20px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            opacity: isListening ? 1 : 0, 
+            transition: 'opacity 0.2s',
+            pointerEvents: 'none'
+          }}>
+            {isListening ? t('listening') : t('pressToTalk')}
+          </p>
+          
+          <button
+            onPointerDown={startListening}
+            onPointerUp={stopListening}
+            onPointerLeave={stopListening}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{
+              touchAction: 'none',
+              width: '110px', // Much larger
+              height: '110px',
+              borderRadius: '50%',
+              backgroundColor: isListening ? '#ef4444' : 'var(--primary-color)',
+              border: '6px solid #f3f4f6',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              transform: isListening ? 'scale(1.05)' : 'scale(1.2) translateY(-25px)', // Pop out effect
+              touchAction: 'none', // Critical for mobile: prevents scrolling/gestures
+              userSelect: 'none', // Prevents text selection
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none' // Prevents iOS context menu
+            }}
+          >
+            <Mic size={55} color="white" />
+          </button>
         </div>
 
-        {/* Reminders Widget */}
-        <ReminderWidget 
-          reminders={displayReminders} 
-          onViewAll={() => navigate('/reminders')} 
-        />
-
-        {/* Welcome Message */}
-        {!transcript && !aiResponse && (
-          <div style={{ textAlign: 'center', marginTop: '20px', color: '#6b7280' }}>
-            <p style={{ fontSize: '1.5rem' }}>{t('mainWelcome')}</p>
+        {/* Right Button: STR */}
+        <button
+          onClick={() => navigate('/str')}
+          className="nav-icon-btn"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            background: 'none',
+            border: 'none',
+            color: '#4b5563',
+            cursor: 'pointer',
+            width: '90px', // Fixed width for symmetry
+            textAlign: 'center'
+          }}
+        >
+          <div style={{ backgroundColor: '#d1fae5', padding: '12px', borderRadius: '50%', marginBottom: '5px' }}>
+            <Banknote size={28} color="#10b981" />
           </div>
-        )}
+          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', lineHeight: '1.2' }}>{t('str')}</span>
+        </button>
+      </div>
 
-        {/* User Transcript */}
-        {transcript && (
-          <div style={{ alignSelf: 'flex-end', backgroundColor: '#dbeafe', padding: '15px', borderRadius: '15px 15px 0 15px', maxWidth: '80%' }}>
-            <p style={{ margin: 0, color: '#1e40af' }}>{transcript}</p>
-          </div>
-        )}
-
-        {/* AI Response */}
-        {aiResponse && (
-          <div style={{ alignSelf: 'flex-start', backgroundColor: '#f3f4f6', padding: '15px', borderRadius: '15px 15px 15px 0', maxWidth: '80%', border: '1px solid #e5e7eb' }}>
-            <p style={{ margin: 0, color: '#374151' }}>{aiResponse}</p>
-          </div>
-        )}
-      </main>
+      {/* Floating Bell Button (When Sidebar Closed) */}
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="bell-trigger"
+          style={{
+            position: 'fixed',
+            bottom: '130px', // Desktop default
+            left: '30px',
+            zIndex: 90,
+            backgroundColor: 'white',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          <Bell size={32} color="#2563eb" />
+          {(requests.length > 0 || Object.keys(reminders).length > 0) && (
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              right: '0',
+              width: '16px',
+              height: '16px',
+              backgroundColor: '#ef4444',
+              borderRadius: '50%',
+              border: '2px solid white'
+            }} />
+          )}
+        </button>
+      )}
 
       {/* Floating QR Code Button - Bottom Right */}
       <button
@@ -390,73 +591,6 @@ const MainPage = () => {
         <QrCode size={40} />
       </button>
 
-      {/* Floating Voice Assistant Button */}
-      <div style={{ 
-        position: 'fixed',
-        bottom: '30px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        backgroundColor: 'white',
-        borderRadius: '50%',
-        padding: '10px',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100
-      }}>
-        {/* Voice Assistant Mic Button */}
-        <div style={{ position: 'relative' }}>
-          {/* Label above mic */}
-          <p style={{ 
-            position: 'absolute',
-            top: '-60px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 'max-content',
-            fontSize: '0.9rem', 
-            color: '#6b7280', 
-            fontWeight: '600',
-            backgroundColor: 'rgba(255,255,255,0.9)',
-            padding: '6px 12px',
-            borderRadius: '20px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            opacity: isListening ? 1 : 0, 
-            transition: 'opacity 0.2s',
-            pointerEvents: 'none'
-          }}>
-            {isListening ? t('listening') : t('pressToTalk')}
-          </p>
-          
-          <button
-            onPointerDown={startListening}
-            onPointerUp={stopListening}
-            onPointerLeave={stopListening}
-            onContextMenu={(e) => e.preventDefault()}
-            style={{
-              width: '110px',
-              height: '110px',
-              borderRadius: '50%',
-              backgroundColor: isListening ? '#ef4444' : 'var(--primary-color)',
-              border: '6px solid #f3f4f6',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              transform: isListening ? 'scale(1.05)' : 'scale(1)',
-              touchAction: 'none',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-              WebkitTouchCallout: 'none'
-            }}
-          >
-            <Mic size={55} color="white" />
-          </button>
-        </div>
-      </div>
-
       {/* Family Dock */}
       <FamilyDock />
 
@@ -464,8 +598,26 @@ const MainPage = () => {
       <QRCodeModal 
         isOpen={isQRModalOpen}
         onClose={() => setIsQRModalOpen(false)}
-        userId={userId}
+        userId="USR001"
       />
+
+      <style>{`
+        @keyframes slideRight {
+          from { transform: translateX(-50px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @media (max-width: 768px) {
+          .bell-trigger {
+            bottom: 260px !important;
+            left: 20px !important;
+          }
+          .sidebar-panel {
+            position: absolute !important;
+            height: 100% !important;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.1) !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
