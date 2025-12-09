@@ -1,7 +1,6 @@
 """
-Hybrid Translation Service: Manual + Google Translate fallback
-Uses manual translations from translations.json as primary source,
-falls back to Google Translate for dynamic/missing content.
+Hybrid Translation Service: Manual translations from Firebase
+Uses manual translations from Firebase translations collection as primary source.
 """
 
 import json
@@ -9,13 +8,13 @@ import os
 from typing import Dict, Optional
 from functools import lru_cache
 
-# Try to import googletrans (free library, no API key needed)
+# Google Translate is optional - we primarily use Firebase translations
+GOOGLE_TRANSLATE_AVAILABLE = False
 try:
     from googletrans import Translator
     GOOGLE_TRANSLATE_AVAILABLE = True
 except ImportError:
-    GOOGLE_TRANSLATE_AVAILABLE = False
-    print("⚠️  googletrans not installed. Install with: pip install googletrans==4.0.0-rc1")
+    pass  # Will use Firebase translations only
 
 
 class HybridTranslationService:
@@ -41,10 +40,20 @@ class HybridTranslationService:
         }
     
     def _load_manual_translations(self) -> Dict:
-        """Load manual translations from translations.json"""
+        """Load manual translations from Firebase or local backup"""
+        try:
+            # Try Firebase first
+            from services.firebase_service import get_translations
+            translations = get_translations()
+            if translations:
+                return translations
+        except Exception as e:
+            print(f"⚠️  Error loading translations from Firebase: {e}")
+        
+        # Fallback to local backup file
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            data_path = os.path.join(current_dir, '..', 'data', 'translations.json')
+            data_path = os.path.join(current_dir, '..', 'backup_data', 'translations.json')
             with open(data_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:

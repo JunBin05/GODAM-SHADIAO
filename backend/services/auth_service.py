@@ -1,19 +1,14 @@
 """
 Authentication service - handles user authentication logic
+Uses Firebase Firestore for data storage
 """
-import json
-import os
 from typing import Optional, Dict
-
-# Load mock users data
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-USERS_FILE = os.path.join(DATA_DIR, 'mock_users.json')
-
-def load_users() -> list:
-    """Load users from mock data file"""
-    with open(USERS_FILE, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        return data['users']
+from services.firebase_service import (
+    get_user_by_id, 
+    get_user_by_ic, 
+    get_all_users, 
+    create_user as firebase_create_user
+)
 
 
 def authenticate_by_pin(user_id: str, pin: str) -> Optional[Dict]:
@@ -27,12 +22,9 @@ def authenticate_by_pin(user_id: str, pin: str) -> Optional[Dict]:
     Returns:
         User dict if authenticated, None if failed
     """
-    users = load_users()
-    
-    for user in users:
-        if user['user_id'] == user_id and user['pin'] == pin:
-            return user
-    
+    user = get_user_by_id(user_id)
+    if user and user.get('pin') == pin:
+        return user
     return None
 
 
@@ -46,12 +38,12 @@ def authenticate_by_face(face_id: str) -> Optional[Dict]:
     Returns:
         User dict if authenticated, None if failed
     """
-    users = load_users()
+    users = get_all_users()
     
     # Mock: Simple string matching for hackathon
     # In production, this would compare embeddings with similarity threshold
     for user in users:
-        if user['face_embedding'] == face_id:
+        if user.get('face_embedding') == face_id:
             return user
     
     return None
@@ -67,12 +59,12 @@ def authenticate_by_voice(voice_id: str) -> Optional[Dict]:
     Returns:
         User dict if authenticated, None if failed
     """
-    users = load_users()
+    users = get_all_users()
     
     # Mock: Simple string matching for hackathon
     # In production, this would compare voice embeddings with similarity threshold
     for user in users:
-        if user['voice_embedding'] == voice_id:
+        if user.get('voice_embedding') == voice_id:
             return user
     
     return None
@@ -88,8 +80,8 @@ def check_ic_exists(ic: str) -> bool:
     Returns:
         True if exists, False otherwise
     """
-    users = load_users()
-    return any(user['ic'] == ic for user in users)
+    user = get_user_by_ic(ic)
+    return user is not None
 
 
 def validate_ic_format(ic: str) -> bool:
@@ -132,13 +124,16 @@ def create_new_user(user_data: dict) -> Dict:
     Returns:
         Created user dictionary with generated user_id
     """
-    users = load_users()
+    users = get_all_users()
     
     # Generate new user_id
     max_user_num = 0
     for user in users:
-        user_num = int(user['user_id'].replace('USR', ''))
-        max_user_num = max(max_user_num, user_num)
+        try:
+            user_num = int(user['user_id'].replace('USR', ''))
+            max_user_num = max(max_user_num, user_num)
+        except (ValueError, KeyError):
+            continue
     
     new_user_id = f"USR{str(max_user_num + 1).zfill(3)}"
     
@@ -164,9 +159,8 @@ def create_new_user(user_data: dict) -> Dict:
         "created_date": user_data.get('created_date', '2024-12-07')
     }
     
-    # Note: In a real system, this would save to database
-    # For hackathon, we're just returning the object
-    # You could append to the JSON file if needed
+    # Save to Firebase
+    firebase_create_user(new_user)
     
     return new_user
 

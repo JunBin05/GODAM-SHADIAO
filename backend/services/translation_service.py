@@ -2,8 +2,21 @@ import json
 import os
 from typing import Dict, Optional
 
+# Flag to switch between Firebase and local JSON
+USE_FIREBASE = True
+
 def load_translations() -> Dict:
-    """Load translations from JSON file"""
+    """Load translations - from Firebase or local JSON"""
+    if USE_FIREBASE:
+        try:
+            from services.firebase_service import get_translations
+            return get_translations()
+        except Exception as e:
+            print(f"Error loading translations from Firebase: {e}")
+            # Fall back to local JSON
+            pass
+    
+    # Load from local JSON
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(current_dir, '..', 'data', 'translations.json')

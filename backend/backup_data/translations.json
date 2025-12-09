@@ -1,0 +1,238 @@
+{
+  "program_names": {
+    "str": {
+      "en": "Sumbangan Tunai Rahmah",
+      "ms": "Sumbangan Tunai Rahmah",
+      "zh": "拉赫玛现金援助",
+      "ta": "ரஹ்மா பண உதவி"
+    },
+    "sara": {
+      "en": "SARA",
+      "ms": "SARA",
+      "zh": "基本援助计划",
+      "ta": "அடிப்படை உதவித் திட்டம்"
+    }
+  },
+  "enrollment_status": {
+    "enrolled": {
+      "en": "Enrolled",
+      "ms": "Telah Mendaftar",
+      "zh": "已注册",
+      "ta": "பதிவு செய்யப்பட்டது"
+    },
+    "not_enrolled": {
+      "en": "Not Enrolled",
+      "ms": "Belum Mendaftar",
+      "zh": "未注册",
+      "ta": "பதிவு செய்யப்படவில்லை"
+    },
+    "pending": {
+      "en": "Pending",
+      "ms": "Dalam Proses",
+      "zh": "处理中",
+      "ta": "நிலுவையில்"
+    }
+  },
+  "messages": {
+    "success": {
+      "en": "Operation successful",
+      "ms": "Operasi berjaya",
+      "zh": "操作成功",
+      "ta": "செயல்பாடு வெற்றிகரமாக முடிந்தது"
+    },
+    "user_not_found": {
+      "en": "User not found",
+      "ms": "Pengguna tidak dijumpai",
+      "zh": "找不到用户",
+      "ta": "பயனர் கண்டுபிடிக்கப்படவில்லை"
+    },
+    "invalid_credentials": {
+      "en": "Invalid credentials",
+      "ms": "Maklumat tidak sah",
+      "zh": "无效凭证",
+      "ta": "தவறான சான்றுகள்"
+    },
+    "not_enrolled_program": {
+      "en": "You are not enrolled in this program",
+      "ms": "Anda tidak mendaftar dalam program ini",
+      "zh": "您尚未注册此计划",
+      "ta": "நீங்கள் இந்த திட்டத்தில் பதிவு செய்யவில்லை"
+    },
+    "authentication_failed": {
+      "en": "Authentication failed",
+      "ms": "Pengesahan gagal",
+      "zh": "身份验证失败",
+      "ta": "அங்கீகாரம் தோல்வியடைந்தது"
+    },
+    "registration_success": {
+      "en": "Registration successful",
+      "ms": "Pendaftaran berjaya",
+      "zh": "注册成功",
+      "ta": "பதிவு வெற்றிகரமாக முடிந்தது"
+    },
+    "qr_generated": {
+      "en": "QR code generated successfully",
+      "ms": "Kod QR berjaya dijana",
+      "zh": "二维码生成成功",
+      "ta": "QR கோட் வெற்றிகரமாக உருவாக்கப்பட்டது"
+    },
+    "payment_success": {
+      "en": "Payment successful",
+      "ms": "Pembayaran berjaya",
+      "zh": "付款成功",
+      "ta": "பணம் வெற்றிகரமாக முடிந்தது"
+    },
+    "insufficient_balance": {
+      "en": "Insufficient balance",
+      "ms": "Baki tidak mencukupi",
+      "zh": "余额不足",
+      "ta": "போதுமான இருப்பு இல்லை"
+    },
+    "qr_expired": {
+      "en": "QR code has expired",
+      "ms": "Kod QR telah tamat tempoh",
+      "zh": "二维码已过期",
+      "ta": "QR கோட் காலாவதியாகிவிட்டது"
+    }
+  },
+  "eligibility": {
+    "eligible": {
+      "en": "You are eligible for this program",
+      "ms": "Anda layak untuk program ini",
+      "zh": "您符合此计划的资格",
+      "ta": "நீங்கள் இந்த திட்டத்திற்கு தகுதியானவர்"
+    },
+    "not_eligible": {
+      "en": "You are not eligible for this program",
+      "ms": "Anda tidak layak untuk program ini",
+      "zh": "您不符合此计划的资格",
+      "ta": "நீங்கள் இந்த திட்டத்திற்கு தகுதியற்றவர் அல்ல"
+    },
+    "income_too_high": {
+      "en": "Your monthly income exceeds the eligibility threshold",
+      "ms": "Pendapatan bulanan anda melebihi had kelayakan",
+      "zh": "您的月收入超过资格阈值",
+      "ta": "உங்கள் மாத வருமானம் தகுதி எல்லையை மீறியது"
+    },
+    "age_requirement": {
+      "en": "You do not meet the minimum age requirement",
+      "ms": "Anda tidak memenuhi keperluan umur minimum",
+      "zh": "您不符合最低年龄要求",
+      "ta": "நீங்கள் குறைந்தபட்ச வயது தேவையை பூர்த்தி செய்யவில்லை"
+    },
+    "approved": {
+      "en": "Your application has been approved",
+      "ms": "Permohonan anda telah diluluskan",
+      "zh": "您的申请已获批准",
+      "ta": "உங்கள் விண்ணப்பம் அங்கீகரிக்கப்பட்டது"
+    },
+    "disability_bonus": {
+      "en": "Additional support available due to disability status",
+      "ms": "Sokongan tambahan disediakan kerana status kurang upaya",
+      "zh": "因残疾状况而提供额外支持",
+      "ta": "முக்கியமான உதவி கிடைக்கும் காரணமாக கூடுதலாக ஆதரவு"
+    }
+  },
+  "fields": {
+    "name": {
+      "en": "Name",
+      "ms": "Nama",
+      "zh": "姓名",
+      "ta": "பெயர்"
+    },
+    "ic_number": {
+      "en": "IC Number",
+      "ms": "Nombor Kad Pengenalan",
+      "zh": "身份证号码",
+      "ta": "அடையாள அட்டை எண்"
+    },
+    "monthly_income": {
+      "en": "Monthly Income",
+      "ms": "Pendapatan Bulanan",
+      "zh": "月收入",
+      "ta": "மாத வருமானம்"
+    },
+    "household_size": {
+      "en": "Household Size",
+      "ms": "Saiz Isi Rumah",
+      "zh": "家庭人数",
+      "ta": "குடும்ப அளவு"
+    },
+    "current_balance": {
+      "en": "Current Balance",
+      "ms": "Baki Semasa",
+      "zh": "当前余额",
+      "ta": "தற்போதைய இருப்பு"
+    },
+    "last_payment": {
+      "en": "Last Payment",
+      "ms": "Pembayaran Terakhir",
+      "zh": "上次付款",
+      "ta": "கடைசி பணம்"
+    },
+    "next_payment": {
+      "en": "Next Payment",
+      "ms": "Pembayaran Seterusnya",
+      "zh": "下次付款",
+      "ta": "அடுத்த பணம்"
+    },
+    "transaction_history": {
+      "en": "Transaction History",
+      "ms": "Sejarah Transaksi",
+      "zh": "交易历史",
+      "ta": "பரிவர்த்தனை வரலாறு"
+    }
+  },
+  "reminder_types": {
+    "credit_expiry": {
+      "en": "Credit will expire soon",
+      "ms": "Kredit akan tamat tempoh tidak lama lagi",
+      "zh": "信用即将过期",
+      "ta": "கடன் வேகமாக காலாவதியாகும்"
+    },
+    "payment_deadline": {
+      "en": "Payment deadline approaching",
+      "ms": "Tarikh akhir pembayaran hampir",
+      "zh": "付款截止日即将到来",
+      "ta": "பணம் கடைசி நாள் நெருங்குகிறது"
+    },
+    "application_update": {
+      "en": "Application status updated",
+      "ms": "Status permohonan dikemaskini",
+      "zh": "申请状态已更新",
+      "ta": "விண்ணப்ப நிலை புதுப்பிக்கப்பட்டது"
+    }
+  },
+  "error_codes": {
+    "USER_NOT_FOUND": {
+      "en": "The specified user does not exist",
+      "ms": "Pengguna yang dinyatakan tidak wujud",
+      "zh": "指定的用户不存在",
+      "ta": "குறிப்பிடப்பட்ட பயனர் இல்லை"
+    },
+    "INVALID_IC": {
+      "en": "Invalid IC number format",
+      "ms": "Format nombor IC tidak sah",
+      "zh": "身份证号码格式无效",
+      "ta": "தவறான அடையாள அட்டை எண் வடிவமைப்பு"
+    },
+    "DUPLICATE_USER": {
+      "en": "User already exists",
+      "ms": "Pengguna sudah wujud",
+      "zh": "用户已存在",
+      "ta": "பயனர் ஏறகனவே இருக்கிறார்"
+    },
+    "MISSING_FIELD": {
+      "en": "Required field is missing",
+      "ms": "Medan yang diperlukan tiada",
+      "zh": "缺少必填字段",
+      "ta": "தேவையான புலம் இல்லை"
+    },
+    "QR_INVALID": {
+      "en": "Invalid QR code",
+      "ms": "Kod QR tidak sah",
+      "zh": "无效的二维码",
+      "ta": "தவறான QR கோட்"
+    }
+  }
+}

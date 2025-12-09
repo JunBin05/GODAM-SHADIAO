@@ -1,36 +1,13 @@
 """
 Aid service - handles aid program business logic
+Uses Firebase Firestore for data storage
 """
-import json
-import os
 from typing import List, Dict, Optional
-
-# Data directory
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-USERS_FILE = os.path.join(DATA_DIR, 'mock_users.json')
-AID_DATA_FILE = os.path.join(DATA_DIR, 'mock_aid_data.json')
-
-
-def load_users() -> List[Dict]:
-    """Load users from mock data"""
-    with open(USERS_FILE, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        return data['users']
-
-
-def load_aid_data() -> Dict:
-    """Load aid data (transactions, reminders)"""
-    with open(AID_DATA_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-
-def get_user_by_id(user_id: str) -> Optional[Dict]:
-    """Get user by user_id"""
-    users = load_users()
-    for user in users:
-        if user['user_id'] == user_id:
-            return user
-    return None
+from services.firebase_service import (
+    get_user_by_id,
+    get_user_transactions,
+    get_program_transactions
+)
 
 
 def get_aid_status(user_id: str) -> List[Dict]:
@@ -88,8 +65,8 @@ def get_aid_balance(user_id: str, program_id: str) -> Optional[Dict]:
     if program_id not in enrolled_programs:
         return None
     
-    aid_data = load_aid_data()
-    transactions = aid_data.get('transactions', {}).get(user_id, {}).get(program_id, [])
+    # Get transactions from Firebase
+    transactions = get_program_transactions(user_id, program_id)
     
     balance_info = {
         "program_id": program_id,
@@ -145,8 +122,8 @@ def get_aid_history(user_id: str, program_id: str) -> Optional[List[Dict]]:
     if program_id not in enrolled_programs:
         return None
     
-    aid_data = load_aid_data()
-    transactions = aid_data.get('transactions', {}).get(user_id, {}).get(program_id, [])
+    # Get transactions from Firebase
+    transactions = get_program_transactions(user_id, program_id)
     
     # Return last 20 transactions (already sorted by date descending in mock data)
     return transactions[:20]

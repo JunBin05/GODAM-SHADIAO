@@ -4,8 +4,26 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from services.auto_translation_service import translate
 
+# Flag to switch between Firebase and local JSON
+USE_FIREBASE = True
+
 def load_reminders() -> Dict:
-    """Load reminders from mock data"""
+    """Load reminders - from Firebase or local JSON"""
+    if USE_FIREBASE:
+        try:
+            from services.firebase_service import get_db
+            db = get_db()
+            reminders = {}
+            for doc in db.collection('reminders').stream():
+                data = doc.to_dict()
+                reminders[doc.id] = data.get('reminders', [])
+            return reminders
+        except Exception as e:
+            print(f"Error loading reminders from Firebase: {e}")
+            # Fall back to local JSON
+            pass
+    
+    # Load from local JSON
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(current_dir, '..', 'data', 'mock_aid_data.json')

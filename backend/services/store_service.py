@@ -3,19 +3,16 @@ import os
 from typing import List, Dict, Optional
 from utils.haversine import haversine_distance
 
+# Flag to switch between Firebase and local JSON (set to True for Firebase)
+USE_FIREBASE = True
+
 def load_stores() -> List[Dict]:
-    """Load stores from store_lists.json (real merchant data)"""
-    try:
-        # Get the directory where this file is located
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # Navigate to the data directory
-        data_path = os.path.join(current_dir, '..', 'data', 'store_lists.json')
-        
-        with open(data_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            # store_lists.json uses 'data' key with different structure
-            stores = data.get('data', [])
-            # Normalize field names to match expected format
+    """Load stores - from Firebase or local JSON based on USE_FIREBASE flag"""
+    if USE_FIREBASE:
+        try:
+            from services.firebase_service import get_all_stores
+            stores = get_all_stores()
+            # Normalize field names from Firebase format
             normalized = []
             for store in stores:
                 normalized.append({
@@ -29,6 +26,34 @@ def load_stores() -> List[Dict]:
                     'postal_code': store.get('postalCode', ''),
                     'type': 'grocery',  # Default type for SARA merchants
                     'accepted_programs': ['str', 'sara']  # Only 2 programs
+                })
+            return normalized
+        except Exception as e:
+            print(f"Error loading stores from Firebase: {e}")
+            # Fall back to local JSON
+            pass
+    
+    # Load from local JSON file
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        data_path = os.path.join(current_dir, '..', 'data', 'store_lists.json')
+        
+        with open(data_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            stores = data.get('data', [])
+            normalized = []
+            for store in stores:
+                normalized.append({
+                    'store_id': store.get('merchantId', ''),
+                    'name': store.get('tradingName', ''),
+                    'address': f"{store.get('address1', '')} {store.get('address2', '')} {store.get('address3', '')}".strip(),
+                    'latitude': store.get('latitude', 0),
+                    'longitude': store.get('longitude', 0),
+                    'state': store.get('state', ''),
+                    'city': store.get('city', ''),
+                    'postal_code': store.get('postalCode', ''),
+                    'type': 'grocery',
+                    'accepted_programs': ['str', 'sara']
                 })
             return normalized
     except FileNotFoundError as e:

@@ -50,3 +50,5 @@ htmlcov/
 
 # Archive folder (optional - comment out if you want to track it)
 # archive/
+
+serviceAccountKey.json

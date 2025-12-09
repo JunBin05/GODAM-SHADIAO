@@ -11,8 +11,21 @@ from config import QR_EXPIRY_MINUTES
 # In-memory storage for active QR codes (in production, use Redis or database)
 active_qr_codes = {}
 
+# Flag to switch between Firebase and local JSON
+USE_FIREBASE = True
+
 def load_users() -> list:
-    """Load users from mock data"""
+    """Load users - from Firebase or local JSON"""
+    if USE_FIREBASE:
+        try:
+            from services.firebase_service import get_all_users
+            return get_all_users()
+        except Exception as e:
+            print(f"Error loading users from Firebase: {e}")
+            # Fall back to local JSON
+            pass
+    
+    # Load from local JSON
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(current_dir, '..', 'data', 'mock_users.json')
@@ -24,14 +37,37 @@ def load_users() -> list:
 
 
 def load_stores() -> list:
-    """Load stores from store_lists.json (real merchant data)"""
+    """Load stores - from Firebase or local JSON"""
+    if USE_FIREBASE:
+        try:
+            from services.firebase_service import get_all_stores
+            stores = get_all_stores()
+            # Normalize field names
+            normalized = []
+            for store in stores:
+                normalized.append({
+                    'store_id': store.get('merchantId', ''),
+                    'name': store.get('tradingName', ''),
+                    'address': f"{store.get('address1', '')} {store.get('address2', '')} {store.get('address3', '')}".strip(),
+                    'latitude': store.get('latitude', 0),
+                    'longitude': store.get('longitude', 0),
+                    'state': store.get('state', ''),
+                    'city': store.get('city', ''),
+                    'type': 'grocery'
+                })
+            return normalized
+        except Exception as e:
+            print(f"Error loading stores from Firebase: {e}")
+            # Fall back to local JSON
+            pass
+    
+    # Load from local JSON
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(current_dir, '..', 'data', 'store_lists.json')
         with open(data_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             stores = data.get('data', [])
-            # Normalize field names
             normalized = []
             for store in stores:
                 normalized.append({
