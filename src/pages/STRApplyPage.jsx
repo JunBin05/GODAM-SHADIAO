@@ -277,9 +277,13 @@ function STRApplyPage() {
     }, 3000);
   };
 
-  // Ask the current field
+  // Ask the current field, skipping already-filled fields
   const askCurrentField = (fieldIdx) => {
-    if (fieldIdx >= formFields.length) {
+    let idx = fieldIdx;
+    while (idx < formFields.length && getFieldValue(formFields[idx])) {
+      idx++;
+    }
+    if (idx >= formFields.length) {
       // All fields done
       const langCode = getUserLanguage();
       const prompts = getVoicePrompts(langCode);
@@ -289,22 +293,14 @@ function STRApplyPage() {
       return;
     }
 
-    const field = formFields[fieldIdx];
+    const field = formFields[idx];
     const langCode = getUserLanguage();
     const prompts = getVoicePrompts(langCode);
     const fieldLabel = field.label[langCode] || field.label['en'];
-    
-    // Check if field already has a value
-    const currentValue = getFieldValue(field);
-    if (currentValue) {
-      const prompt = prompts.alreadyFilled.replace('{value}', currentValue);
-      speak(prompt, langCode);
-    } else {
-      const prompt = prompts.askField.replace('{field}', fieldLabel);
-      speak(prompt, langCode);
-    }
-    
-    setCurrentFieldIndex(fieldIdx);
+
+    const prompt = prompts.askField.replace('{field}', fieldLabel);
+    speak(prompt, langCode);
+    setCurrentFieldIndex(idx);
   };
 
   // Handle mic button press (single button for all fields)
@@ -332,8 +328,74 @@ function STRApplyPage() {
         setIsProcessing(true);
 
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        // Convert webm to wav for backend compatibility
+        const convertToWav = async (blob) => {
+          const arrayBuffer = await blob.arrayBuffer();
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          // Mono, 16kHz, PCM
+          const numChannels = 1;
+          const sampleRate = 16000;
+          const bitDepth = 16;
+          let audioData = audioBuffer.getChannelData(0);
+          // Resample if needed
+          if (audioBuffer.sampleRate !== sampleRate) {
+            const ratio = audioBuffer.sampleRate / sampleRate;
+            const newLength = Math.round(audioBuffer.length / ratio);
+            const result = new Float32Array(newLength);
+            for (let i = 0; i < newLength; i++) {
+              const srcIndex = i * ratio;
+              const srcIndexFloor = Math.floor(srcIndex);
+              const srcIndexCeil = Math.min(srcIndexFloor + 1, audioData.length - 1);
+              const fraction = srcIndex - srcIndexFloor;
+              result[i] = audioData[srcIndexFloor] * (1 - fraction) + audioData[srcIndexCeil] * fraction;
+            }
+            audioData = result;
+          }
+          const dataLength = audioData.length * (bitDepth / 8);
+          const headerLength = 44;
+          const totalLength = headerLength + dataLength;
+          const buffer = new ArrayBuffer(totalLength);
+          const view = new DataView(buffer);
+          const writeString = (offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+              view.setUint8(offset + i, string.charCodeAt(i));
+            }
+          };
+          writeString(0, 'RIFF');
+          view.setUint32(4, totalLength - 8, true);
+          writeString(8, 'WAVE');
+          writeString(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, numChannels, true);
+          view.setUint32(24, sampleRate, true);
+          view.setUint32(28, sampleRate * numChannels * (bitDepth / 8), true);
+          view.setUint16(32, numChannels * (bitDepth / 8), true);
+          view.setUint16(34, bitDepth, true);
+          writeString(36, 'data');
+          view.setUint32(40, dataLength, true);
+          let offset = 44;
+          for (let i = 0; i < audioData.length; i++) {
+            const sample = Math.max(-1, Math.min(1, audioData[i]));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+            offset += 2;
+          }
+          return new Blob([buffer], { type: 'audio/wav' });
+        };
+
+        let wavBlob;
+        try {
+          wavBlob = await convertToWav(audioBlob);
+        } catch (err) {
+          console.error('WAV conversion error:', err);
+          wavBlob = audioBlob; // fallback to webm if conversion fails
+        }
+
         const formDataToSend = new FormData();
-        formDataToSend.append('audio', audioBlob, 'recording.webm');
+        formDataToSend.append('audio', wavBlob, 'recording.wav');
+        formDataToSend.append('language', getUserLanguage());
 
         try {
           const response = await fetch('http://localhost:8000/voice/transcribe', {
