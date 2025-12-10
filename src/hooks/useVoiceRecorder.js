@@ -6,7 +6,7 @@
 import { useState, useRef, useCallback } from 'react';
 
 // Configuration
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8000/api';
 const RECORD_DURATION = 5000; // 5 seconds in milliseconds
 
 export const useVoiceRecorder = () => {
@@ -160,6 +160,49 @@ export const useVoiceRecorder = () => {
       }
     });
   }, []);
+
+
+  /**
+   * Voice registration
+   * @param {string} userId - User's IC number or unique ID
+   * @param {Blob} audioBlob1 - Recorded audio blob in WAV format
+   * @param {Blob} audioBlob2 - Recorded audio blob in WAV format for confirmation
+   * @returns {Promise<{success: boolean, message: string, step: string}>}
+   */
+  const voiceRegistration = useCallback(async (userId, audioBlob1, audioBlob2) => {
+    setError(null);
+    setIsProcessing(true);
+    try {
+      // First recording
+      let formData = new FormData();
+      formData.append('user_id', userId);
+      formData.append('voice_1', audioBlob1, 'voice_registration_1.wav');
+      formData.append('voice_2', audioBlob2, 'voice_registration_2.wav');
+      let response = await fetch(`${API_BASE_URL}/user/update_voice`, {
+        method: 'POST',
+        body: formData,
+      });
+      let result = await response.json();
+      console.log('Voice registration response:', result);
+      setIsProcessing(false);
+      if (response.ok) {
+        if (result.status === 'success'){
+          return { success: true, message: result.message, step: 'completed', matched: true };
+        } else if (result.status === 'fail'){
+          return { success: false, message: result.message, step: 'failed', matched: false};
+        }
+        
+      } else {
+        throw new Error(result.detail || 'Registration failed');
+      }
+    } catch (err) {
+      console.error('Voice registration error:', err);
+      setError(err.message);
+      setIsProcessing(false);
+      return { success: false, message: err.message, step: 'failed' };
+    }
+  }, []);
+
 
   /**
    * Start voice registration (first recording)
@@ -354,12 +397,11 @@ export const useVoiceRecorder = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/health`, { timeout: 5000 });
       if (response.ok) {
-        const data = await response.json();
-        return { online: true, modelLoaded: data.model_loaded };
+        return true;
       }
-      return { online: false, modelLoaded: false };
+      return false;
     } catch {
-      return { online: false, modelLoaded: false };
+      return false;
     }
   }, []);
 
@@ -375,6 +417,8 @@ export const useVoiceRecorder = () => {
     cancelRegistration,
     verifyVoice,
     checkServer,
+    voiceRegistration,
+    recordAndGetWav,
   };
 };
 

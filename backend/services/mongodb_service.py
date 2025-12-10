@@ -229,10 +229,43 @@ def update_translations(translations: Dict) -> bool:
     )
     return result.modified_count > 0 or result.upserted_id is not None
 
+# ============ VOICE EMBEDDING OPERATIONS ============
+def save_face_embedding(ic: str, embedding: List[float]) -> bool:
+    """Save face embedding to user document"""
+    db = get_db()
+
+    # Check if user exists
+    user = db.users.find_one({"_id": ic})
+
+    if user:
+        # Update existing user
+        result = db.users.update_one(
+            {"_id": ic},
+            {"$set": {"face_embedding": embedding}}
+        )
+        return result.modified_count > 0
+    else:
+        # Create new user
+        db.users.insert_one({
+            "_id": ic,
+            "name": "Unknown",
+            "face_embedding": embedding,
+            "created_date": "2024-12-10"
+        })
+        return True
+
+
+def get_face_embedding(ic: str) -> Optional[List[float]]:
+    """Get face embedding for a user by IC"""
+    user = get_user_by_id(ic)
+    if user and 'face_embedding' in user:
+        return user['face_embedding']
+    return None
+
 
 # ============ VOICE EMBEDDING OPERATIONS ============
 
-def save_voice_embedding(ic: str, embedding: List[float], name: str = None) -> bool:
+def save_voice_embedding(ic: str, embedding: List[float]) -> bool:
     """Save voice embedding to user document"""
     db = get_db()
     
@@ -240,8 +273,6 @@ def save_voice_embedding(ic: str, embedding: List[float], name: str = None) -> b
     user = db.users.find_one({"_id": ic})
     
     update_data = {"voiceEmbedding": embedding}
-    if name:
-        update_data["name"] = name
     
     if user:
         # Update existing user
@@ -254,7 +285,6 @@ def save_voice_embedding(ic: str, embedding: List[float], name: str = None) -> b
         # Create new user
         db.users.insert_one({
             "_id": ic,
-            "name": name if name else "Unknown",
             "voiceEmbedding": embedding,
             "created_date": "2024-12-10"
         })

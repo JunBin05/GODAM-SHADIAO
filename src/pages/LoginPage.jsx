@@ -7,6 +7,10 @@ import CameraCapture from '../components/CameraCapture';
 import { useAuth } from '../hooks/useAPI';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 
+
+const API_BASE_URL = 'http://localhost:8000/api';
+
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -27,7 +31,7 @@ const LoginPage = () => {
   useEffect(() => {
     const checkVoiceServer = async () => {
       const status = await checkServer();
-      setServerOnline(status.online && status.modelLoaded);
+      setServerOnline(status);
     };
     checkVoiceServer();
   }, [checkServer]);
@@ -61,18 +65,19 @@ const LoginPage = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      const response = await fetch(`http://localhost:8000/user/${encodeURIComponent(icInput)}`, {
-        signal: controller.signal
+      const response = await fetch(`${API_BASE_URL}/user/user_exists`, {
+        signal: controller.signal,
+        method: 'POST',
+        body: JSON.stringify({ nric: icInput }),
+        headers: { 'Content-Type': 'application/json' }
       });
       clearTimeout(timeoutId);
       const result = await response.json();
       console.log('[LOGIN] IC check result:', result);
 
-      if (response.ok && result.success) {
+      if (response.ok && result.user_exists) {
         setUserData({
-          name: result.name,
-          icNumber: result.icNumber,
-          language: result.language,
+          icNumber: icInput,
           hasVoice: result.hasVoice,
           hasFace: result.hasFace
         });
@@ -88,7 +93,7 @@ const LoginPage = () => {
             return;
           }
         }
-        setError(result.detail || t('notRegistered'));
+        setError(result.message || t('notRegistered'));
       }
     } catch (err) {
       console.error('Error checking IC:', err);
@@ -116,12 +121,34 @@ const LoginPage = () => {
   const handleFaceVerify = async (imageSrc) => {
     setIsVerifying(true);
     try {
-      // For demo: face verification always succeeds after 2 seconds
-      // In production, send imageSrc to backend for face recognition
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // // For demo: face verification always succeeds after 2 seconds
+      // // In production, send imageSrc to backend for face recognition
+
+      // await new Promise(resolve => setTimeout(resolve, 2000));
       
+      const response = await fetch(`${API_BASE_URL}/user/login_face`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nric: userData.icNumber,
+          face_image_url: imageSrc,
+        }),
+      });
+      const result = await response.json();
+      console.log('[LOGIN] Face verification result:', result);
+      if (!response.ok || !result.verified) {
+        throw new Error(result.message || 'Face not recognized');
+      }
+
+      console.log('✓ Face verified successfully');
+      const updatedUserData = result.userData || {};
+      setUserData(updatedUserData);
+
+
       // Save user data to localStorage for other pages
-      localStorage.setItem('registeredUser', JSON.stringify(userData));
+      localStorage.setItem('registeredUser', JSON.stringify(updatedUserData));
       
       setIsVerifying(false);
       setStep('success');

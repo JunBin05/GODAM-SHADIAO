@@ -34,111 +34,16 @@ async def root():
         "status": "running"
     }
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     return {
         "success": True,
         "status": "healthy",
         "message": "API is operational",
-        "model_loaded": True  # For voice login compatibility
     }
 
-# User lookup endpoint - IC is the document ID
-@app.get("/user/{ic}")
-async def get_user_by_ic(ic: str):
-    """Get user by IC number (IC is the document ID in MongoDB)"""
-    from services.mongodb_service import get_user_by_id
-    
-    # Mock test users for easy testing (fallback)
-    test_users = {
-        "test": {"name": "Test User", "icNumber": "test", "language": "en", "hasVoice": True, "hasFace": True},
-        "demo": {"name": "Demo User", "icNumber": "demo", "language": "en", "hasVoice": True, "hasFace": True},
-    }
-    
-    # Check test users first
-    if ic in test_users:
-        return {"success": True, **test_users[ic]}
-    
-    # Check MongoDB - IC is the _id
-    try:
-        user = get_user_by_id(ic)
-        
-        if user:
-            return {
-                "success": True,
-                "name": user.get('name', ''),
-                "icNumber": ic,
-                "language": user.get('preferred_language', 'en'),
-                "hasVoice": bool(user.get('voiceEmbedding')),
-                "hasFace": bool(user.get('face_embedding'))
-            }
-    except Exception as e:
-        print(f"Error loading user from MongoDB: {e}")
-    
-    return {"success": False, "detail": "User not found. Try 'test' or 'demo' for testing."}
 
 
-# Simple user registration endpoint for frontend
-@app.post("/user/register")
-async def simple_register(request: dict):
-    """Simple registration endpoint for frontend - uses IC as document ID in MongoDB"""
-    from services.mongodb_service import get_user_by_id, create_user, update_user
-    
-    ic_number = request.get('icNumber', '')
-    name = request.get('name', '')
-    language = request.get('language', 'en')
-    face_embedding = request.get('faceEmbedding')
-    voice_embedding = request.get('voiceEmbedding')
-    
-    if not ic_number:
-        return {"success": False, "detail": "IC number is required"}
-    
-    # Check if user already exists (IC is the _id)
-    try:
-        user = get_user_by_id(ic_number)
-        
-        if user:
-            # Update existing user
-            update_data = {}
-            if name:
-                update_data['name'] = name
-            if language:
-                update_data['preferred_language'] = language
-            if face_embedding:
-                update_data['face_embedding'] = face_embedding
-            if voice_embedding:
-                update_data['voiceEmbedding'] = voice_embedding
-            
-            if update_data:
-                update_user(ic_number, update_data)
-            
-            return {
-                "success": True,
-                "message": "User updated",
-                "user_id": ic_number,
-                "name": name
-            }
-        else:
-            # Create new user with IC as _id
-            new_user = {
-                "_id": ic_number,
-                "name": name or "New User",
-                "preferred_language": language,
-                "face_embedding": face_embedding if face_embedding else None,
-                "voiceEmbedding": voice_embedding if voice_embedding else None,
-                "created_date": "2024-12-10"
-            }
-            
-            create_user(new_user)
-            return {
-                "success": True,
-                "message": "Registration successful",
-                "user_id": ic_number,
-                "name": new_user['name']
-            }
-    except Exception as e:
-        print(f"Error in registration: {e}")
-        return {"success": False, "detail": str(e)}
 
 
 # Financial Aid Eligibility endpoint - fetches from Firebase financialAid collection
@@ -179,6 +84,10 @@ async def get_financial_aid(ic: str):
 
 
 # Router registration - DISABLED: These still use Firebase which is exhausted
+
+from routes import user
+app.include_router(user.router, prefix="/api/user", tags=["User Management"])
+
 # TODO: Update these services to use MongoDB
 # try:
 #     from routes import auth, aid, store, payment, reminder, str_application
@@ -193,27 +102,27 @@ async def get_financial_aid(ic: str):
 #     print(f"⚠ Additional routes not loaded: {e}")
 
 # Mount voice login routes from load_VoiceLogin_Model
-try:
-    from load_VoiceLogin_Model import app as voice_app
-    # Import the routes directly instead of mounting
-    from load_VoiceLogin_Model import (
-        health_check as voice_health,
-        register_user_data,
-        register_voice,
-        start_registration,
-        confirm_registration,
-        cancel_registration,
-        login_voice
-    )
-    # Add voice routes to main app
-    app.post("/voice/register")(register_voice)
-    app.post("/voice/register/start")(start_registration)
-    app.post("/voice/register/confirm")(confirm_registration)
-    app.delete("/voice/register/cancel/{user_id}")(cancel_registration)
-    app.post("/voice/login")(login_voice)
-    print("✓ Voice login routes loaded successfully")
-except Exception as e:
-    print(f"⚠ Voice login routes not available: {e}")
+# try:
+#     from load_VoiceLogin_Model import app as voice_app
+#     # Import the routes directly instead of mounting
+#     from load_VoiceLogin_Model import (
+#         health_check as voice_health,
+#         register_user_data,
+#         register_voice,
+#         start_registration,
+#         confirm_registration,
+#         cancel_registration,
+#         login_voice
+#     )
+#     # Add voice routes to main app
+#     app.post("/voice/register")(register_voice)
+#     app.post("/voice/register/start")(start_registration)
+#     app.post("/voice/register/confirm")(confirm_registration)
+#     app.delete("/voice/register/cancel/{user_id}")(cancel_registration)
+#     app.post("/voice/login")(login_voice)
+#     print("✓ Voice login routes loaded successfully")
+# except Exception as e:
+#     print(f"⚠ Voice login routes not available: {e}")
 
 if __name__ == "__main__":
     import uvicorn
