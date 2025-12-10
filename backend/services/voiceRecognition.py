@@ -12,8 +12,8 @@ from services.mongodb_service import save_voice_embedding, load_voice_embedding
 from typing import Optional
 from io import BytesIO
 
-SIMILARITY_THRESHOLD = 0.75
-CONFIRMATION_THRESHOLD = 0.80
+SIMILARITY_THRESHOLD = 0.55  # Lowered for more lenient matching
+CONFIRMATION_THRESHOLD = 0.60  # Lowered for registration confirmation
 
 
 

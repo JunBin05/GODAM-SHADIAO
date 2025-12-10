@@ -51,7 +51,9 @@ TEMP_DIR = Path("./temp_audio")
 TEMP_DIR.mkdir(exist_ok=True)
 
 # Cosine similarity threshold for authentication
-SIMILARITY_THRESHOLD = 0.75
+# Lowered from 0.75 to 0.55 for more lenient voice matching
+# (Voice can vary due to background noise, mic quality, etc.)
+SIMILARITY_THRESHOLD = 0.55
 
 # MongoDB configuration (uses connection from mongodb_service.py)
 # No additional initialization needed - mongodb_service handles connection

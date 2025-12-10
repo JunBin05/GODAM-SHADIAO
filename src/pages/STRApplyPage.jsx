@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useSTRApplication } from '../hooks/useAPI';
 import { ChevronLeft, ChevronRight, Check, Mic, Volume2, Loader2 } from 'lucide-react';
 import { authAPI } from '../services/api';
+import LanguageToggle from '../components/LanguageToggle';
 
 function STRApplyPage() {
   const navigate = useNavigate();
@@ -21,6 +22,9 @@ function STRApplyPage() {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(-1);
   const [pendingValue, setPendingValue] = useState(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [awaitingChangeConfirmation, setAwaitingChangeConfirmation] = useState(false);
+  const [awaitingChildrenCount, setAwaitingChildrenCount] = useState(false);
+  const [childrenFieldsGenerated, setChildrenFieldsGenerated] = useState(false);
   
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -51,15 +55,27 @@ function STRApplyPage() {
   });
 
   // Define the voice form fields in order
-  const formFields = [
-    { key: 'applicant.name', label: { en: 'full name', ms: 'nama penuh', zh: '全名', hk: '全名' }, section: 'applicant', field: 'name' },
-    { key: 'applicant.ic_number', label: { en: 'IC number', ms: 'nombor IC', zh: 'IC号码', hk: 'IC號碼' }, section: 'applicant', field: 'ic_number' },
-    { key: 'applicant.marital_status', label: { en: 'marital status (single, married, divorced, or widowed)', ms: 'status perkahwinan (bujang, berkahwin, bercerai, atau balu)', zh: '婚姻状况', hk: '婚姻狀況' }, section: 'applicant', field: 'marital_status', type: 'select' },
-    { key: 'applicant.monthly_income', label: { en: 'monthly income in Ringgit', ms: 'pendapatan bulanan dalam Ringgit', zh: '月收入', hk: '月收入' }, section: 'applicant', field: 'monthly_income' },
-    { key: 'guardian.name', label: { en: 'emergency contact name', ms: 'nama hubungan kecemasan', zh: '紧急联系人姓名', hk: '緊急聯絡人姓名' }, section: 'guardian', field: 'name' },
-    { key: 'guardian.relationship', label: { en: 'relationship with emergency contact', ms: 'hubungan dengan kenalan kecemasan', zh: '与紧急联系人的关系', hk: '與緊急聯絡人嘅關係' }, section: 'guardian', field: 'relationship' },
-    { key: 'guardian.phone', label: { en: 'emergency contact phone number', ms: 'nombor telefon hubungan kecemasan', zh: '紧急联系人电话', hk: '緊急聯絡人電話' }, section: 'guardian', field: 'phone' },
-  ];
+  // Base form fields (children fields will be added dynamically)
+  const [formFields, setFormFields] = useState([
+    // Applicant fields
+    { key: 'applicant.name', label: { en: 'full name', ms: 'nama penuh', zh: '全名', hk: '全名', ta: 'முழு பெயர்' }, section: 'applicant', field: 'name' },
+    { key: 'applicant.ic_number', label: { en: 'IC number', ms: 'nombor IC', zh: 'IC号码', hk: 'IC號碼', ta: 'IC எண்' }, section: 'applicant', field: 'ic_number' },
+    { key: 'applicant.marital_status', label: { en: 'marital status (single, married, divorced, or widowed)', ms: 'status perkahwinan (bujang, berkahwin, bercerai, atau balu)', zh: '婚姻状况', hk: '婚姻狀況', ta: 'திருமண நிலை' }, section: 'applicant', field: 'marital_status', type: 'select' },
+    { key: 'applicant.monthly_income', label: { en: 'monthly income in Ringgit', ms: 'pendapatan bulanan dalam Ringgit', zh: '月收入', hk: '月收入', ta: 'மாத வருமானம்' }, section: 'applicant', field: 'monthly_income', type: 'number' },
+    // Spouse fields (conditional on married status)
+    { key: 'spouse.name', label: { en: 'spouse full name', ms: 'nama penuh pasangan', zh: '配偶全名', hk: '配偶全名', ta: 'துணையின் முழு பெயர்' }, section: 'spouse', field: 'name', conditional: 'married' },
+    { key: 'spouse.ic_number', label: { en: 'spouse IC number', ms: 'nombor IC pasangan', zh: '配偶IC号码', hk: '配偶IC號碼', ta: 'துணையின் IC எண்' }, section: 'spouse', field: 'ic_number', conditional: 'married' },
+    // CHILDREN_PLACEHOLDER - Dynamic children fields inserted here
+    { key: '__children_placeholder__', type: 'placeholder' },
+    // Document confirmation (boolean fields)
+    { key: 'documents.ic_copy', label: { en: 'Do you have your IC copy ready?', ms: 'Adakah anda ada salinan IC?', zh: '您有IC副本吗？', hk: '你有IC副本嗎？', ta: 'உங்களிடம் IC நகல் உள்ளதா?' }, section: 'documents', field: 'ic_copy', type: 'boolean' },
+    { key: 'documents.income_proof', label: { en: 'Do you have proof of income ready?', ms: 'Adakah anda ada bukti pendapatan?', zh: '您有收入证明吗？', hk: '你有收入證明嗎？', ta: 'உங்களிடம் வருமான சான்று உள்ளதா?' }, section: 'documents', field: 'income_proof', type: 'boolean' },
+    { key: 'documents.marriage_cert', label: { en: 'Do you have your marriage certificate ready?', ms: 'Adakah anda ada sijil nikah?', zh: '您有结婚证吗？', hk: '你有結婚證書嗎？', ta: 'உங்களிடம் திருமண சான்றிதழ் உள்ளதா?' }, section: 'documents', field: 'marriage_cert', type: 'boolean', conditional: 'married' },
+    // Guardian/Emergency contact fields
+    { key: 'guardian.name', label: { en: 'emergency contact name', ms: 'nama hubungan kecemasan', zh: '紧急联系人姓名', hk: '緊急聯絡人姓名', ta: 'அவசர தொடர்பு பெயர்' }, section: 'guardian', field: 'name' },
+    { key: 'guardian.relationship', label: { en: 'relationship with emergency contact', ms: 'hubungan dengan kenalan kecemasan', zh: '与紧急联系人的关系', hk: '與緊急聯絡人嘅關係', ta: 'அவசர தொடர்பு உறவு' }, section: 'guardian', field: 'relationship' },
+    { key: 'guardian.phone', label: { en: 'emergency contact phone number', ms: 'nombor telefon hubungan kecemasan', zh: '紧急联系人电话', hk: '緊急聯絡人電話', ta: 'அவசர தொடர்பு தொலைபேசி' }, section: 'guardian', field: 'phone' },
+  ]);
 
   // API integration
   const { submitApplication, submitting } = useSTRApplication(currentLanguage);
@@ -72,20 +88,10 @@ function STRApplyPage() {
     return 'ms';
   };
 
-  // Get user's preferred language from stored user or database
+  // Get user's preferred language from context (synced with language selector)
   const getUserLanguage = () => {
-    try {
-      const storedUser = localStorage.getItem('registeredUser');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        const lang = user.language || user.preferred_language || 'ms';
-        if (lang === 'HK' || lang === 'hk') return 'hk';
-        if (lang === 'BC' || lang === 'zh') return 'zh';
-        if (lang === 'BI' || lang === 'en') return 'en';
-        return 'ms';
-      }
-    } catch (e) {}
-    return getLangCode();
+    // Use current language from context (updated by LanguageToggle)
+    return currentLanguage || 'ms';
   };
 
   // Fetch user data from MongoDB on mount
@@ -178,25 +184,63 @@ function STRApplyPage() {
     fetchUserData();
   }, []);
 
-  // Text-to-speech function with language detection
-  const speak = (text, lang = null) => {
+  // Load speech synthesis voices (they load asynchronously)
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = synthRef.current.getVoices();
+      if (voices.length > 0) {
+        console.log(`🔊 Loaded ${voices.length} TTS voices`);
+      }
+    };
+    
+    // Chrome loads voices asynchronously
+    if (synthRef.current.onvoiceschanged !== undefined) {
+      synthRef.current.onvoiceschanged = loadVoices;
+    }
+    loadVoices();
+  }, []);
+
+  // Text-to-speech function with language detection and voice selection
+  const speak = (text, lang = null, onComplete = null) => {
     if (synthRef.current.speaking) synthRef.current.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     
     const langCode = lang || getUserLanguage();
     
     // Map to TTS language codes
+    let ttsLang;
     if (langCode === 'hk') {
-      utterance.lang = 'zh-HK';  // Cantonese
+      ttsLang = 'zh-HK';  // Cantonese
     } else if (langCode === 'zh') {
-      utterance.lang = 'zh-CN';  // Mandarin
+      ttsLang = 'zh-CN';  // Mandarin
     } else if (langCode === 'en') {
-      utterance.lang = 'en-US';
+      ttsLang = 'en-US';
+    } else if (langCode === 'ta') {
+      ttsLang = 'ta-IN';  // Tamil
     } else {
-      utterance.lang = 'ms-MY';  // Malay
+      ttsLang = 'ms-MY';  // Malay
+    }
+    
+    utterance.lang = ttsLang;
+    
+    // Try to find a voice that matches the language
+    const voices = synthRef.current.getVoices();
+    const matchingVoice = voices.find(v => v.lang.startsWith(ttsLang.split('-')[0])) ||
+                          voices.find(v => v.lang.includes(ttsLang.split('-')[0]));
+    if (matchingVoice) {
+      utterance.voice = matchingVoice;
+      console.log(`🔊 Using voice: ${matchingVoice.name} (${matchingVoice.lang}) for lang: ${langCode}`);
+    } else {
+      console.log(`⚠️ No matching voice found for ${ttsLang}, using default`);
     }
     
     utterance.rate = 0.9;
+    
+    // Call onComplete callback when speech finishes
+    if (onComplete) {
+      utterance.onend = onComplete;
+    }
+    
     synthRef.current.speak(utterance);
     setVoicePrompt(text);
   };
@@ -205,8 +249,9 @@ function STRApplyPage() {
   const getVoicePrompts = (langCode) => {
     const prompts = {
       en: {
-        welcome: "I'll help you fill the form. Press the microphone button when you're ready to answer each question.",
+        welcome: "I'll help you fill the form. Press and hold the microphone button when you're ready to answer each question. You can say 'skip' to skip a field.",
         askField: "Please say your {field}.",
+        askFieldWithProgress: "Question {current} of {total}. Please say your {field}.",
         confirm: 'I heard "{value}". Is this correct? Press the microphone and say Yes or No.',
         confirmed: "Got it! Moving to the next field.",
         retry: "Okay, let's try again.",
@@ -214,8 +259,9 @@ function STRApplyPage() {
         alreadyFilled: "This field is already filled with: {value}. Do you want to change it?"
       },
       ms: {
-        welcome: "Saya akan bantu anda mengisi borang. Tekan butang mikrofon apabila anda sedia untuk menjawab setiap soalan.",
+        welcome: "Saya akan bantu anda mengisi borang. Tekan dan tahan butang mikrofon apabila anda sedia untuk menjawab setiap soalan. Anda boleh sebut 'langkau' untuk langkau medan.",
         askField: "Sila sebut {field} anda.",
+        askFieldWithProgress: "Soalan {current} daripada {total}. Sila sebut {field} anda.",
         confirm: 'Saya dengar "{value}". Adakah betul? Tekan mikrofon dan sebut Ya atau Tidak.',
         confirmed: "Difahami! Ke medan seterusnya.",
         retry: "Baiklah, mari cuba lagi.",
@@ -223,8 +269,9 @@ function STRApplyPage() {
         alreadyFilled: "Medan ini sudah diisi dengan: {value}. Adakah anda mahu tukar?"
       },
       zh: {
-        welcome: "我会帮你填写表格。准备好回答每个问题时，请按麦克风按钮。",
+        welcome: "我会帮你填写表格。准备好回答每个问题时，请按住麦克风按钮。你可以说'跳过'来跳过字段。",
         askField: "请说出你的{field}。",
+        askFieldWithProgress: "第{current}个问题，共{total}个。请说出你的{field}。",
         confirm: '我听到"{value}"。这是正确的吗？按麦克风说是或否。',
         confirmed: "明白了！转到下一个字段。",
         retry: "好的，让我们再试一次。",
@@ -232,13 +279,24 @@ function STRApplyPage() {
         alreadyFilled: "此字段已填写：{value}。你要更改吗？"
       },
       hk: {
-        welcome: "我會幫你填寫表格。準備好回答每個問題時，請撳麥克風按鈕。",
+        welcome: "我會幫你填寫表格。準備好回答每個問題時，請撳住麥克風按鈕。你可以講'跳過'來跳過欄位。",
         askField: "請講出你嘅{field}。",
+        askFieldWithProgress: "第{current}題，共{total}題。請講出你嘅{field}。",
         confirm: '我聽到"{value}"。啱唔啱？撳麥克風講係或者唔係。',
         confirmed: "明白咗！去下一個欄位。",
         retry: "好嘅，我哋再試過。",
         allDone: "所有欄位已經填好。請檢查表格。",
         alreadyFilled: "呢個欄位已經填咗：{value}。你想改嗎？"
+      },
+      ta: {
+        welcome: "படிவத்தை நிரப்ப உங்களுக்கு உதவுவேன். ஒவ்வொரு கேள்விக்கும் பதிலளிக்க தயாராக இருக்கும்போது மைக்ரோஃபோன் பட்டனை அழுத்திப் பிடிக்கவும். 'தவிர்' என்று சொல்லி புலத்தை தவிர்க்கலாம்.",
+        askField: "உங்கள் {field} சொல்லுங்கள்.",
+        askFieldWithProgress: "{total} கேள்விகளில் {current}வது. உங்கள் {field} சொல்லுங்கள்.",
+        confirm: '"{value}" என்று கேட்டேன். இது சரியா? மைக்ரோஃபோனை அழுத்தி ஆமா அல்லது இல்லை என்று சொல்லுங்கள்.',
+        confirmed: "புரிந்தது! அடுத்த புலத்திற்கு செல்கிறேன்.",
+        retry: "சரி, மீண்டும் முயற்சிக்கலாம்.",
+        allDone: "அனைத்து புலங்களும் நிரப்பப்பட்டன. படிவத்தை சரிபார்க்கவும்.",
+        alreadyFilled: "இந்த புலம் ஏற்கனவே நிரப்பப்பட்டுள்ளது: {value}. மாற்ற விரும்புகிறீர்களா?"
       }
     };
     return prompts[langCode] || prompts['ms'];
@@ -246,18 +304,93 @@ function STRApplyPage() {
 
   // Get field value from formData
   const getFieldValue = (fieldConfig) => {
+    // Handle children array fields
+    if (fieldConfig.section === 'children' && fieldConfig.index !== undefined) {
+      return formData.children[fieldConfig.index]?.[fieldConfig.field] || '';
+    }
     return formData[fieldConfig.section]?.[fieldConfig.field] || '';
   };
 
   // Set field value in formData
   const setFieldValue = (fieldConfig, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldConfig.section]: {
-        ...prev[fieldConfig.section],
-        [fieldConfig.field]: value
+    // Convert to number for number fields
+    let processedValue = value;
+    if (fieldConfig.type === 'number') {
+      // Extract numbers only and convert to number type
+      const numericString = String(value).replace(/[^0-9.]/g, '');
+      processedValue = numericString ? parseFloat(numericString) || numericString : value;
+    }
+    
+    // Handle children array fields
+    if (fieldConfig.section === 'children' && fieldConfig.index !== undefined) {
+      setFormData(prev => {
+        const newChildren = [...prev.children];
+        if (!newChildren[fieldConfig.index]) {
+          newChildren[fieldConfig.index] = { name: '', ic_number: '' };
+        }
+        newChildren[fieldConfig.index] = {
+          ...newChildren[fieldConfig.index],
+          [fieldConfig.field]: processedValue
+        };
+        return { ...prev, children: newChildren };
+      });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [fieldConfig.section]: {
+          ...prev[fieldConfig.section],
+          [fieldConfig.field]: processedValue
+        }
+      }));
+    }
+  };
+
+  // Generate children fields dynamically
+  const generateChildrenFields = (count) => {
+    const childrenFields = [];
+    for (let i = 0; i < count; i++) {
+      childrenFields.push(
+        {
+          key: `children[${i}].name`,
+          label: {
+            en: `child ${i + 1} name`,
+            ms: `nama anak ${i + 1}`,
+            zh: `孩子${i + 1}的名字`,
+            hk: `仔女${i + 1}嘅名`,
+            ta: `குழந்தை ${i + 1} பெயர்`
+          },
+          section: 'children',
+          field: 'name',
+          index: i
+        },
+        {
+          key: `children[${i}].ic_number`,
+          label: {
+            en: `child ${i + 1} IC number`,
+            ms: `nombor IC anak ${i + 1}`,
+            zh: `孩子${i + 1}的IC号码`,
+            hk: `仔女${i + 1}嘅IC號碼`,
+            ta: `குழந்தை ${i + 1} IC எண்`
+          },
+          section: 'children',
+          field: 'ic_number',
+          index: i
+        }
+      );
+    }
+    
+    // Replace placeholder with actual children fields
+    setFormFields(prev => {
+      const placeholderIndex = prev.findIndex(f => f.key === '__children_placeholder__');
+      if (placeholderIndex !== -1) {
+        const newFields = [...prev];
+        newFields.splice(placeholderIndex, 1, ...childrenFields);
+        return newFields;
       }
-    }));
+      return prev;
+    });
+    
+    setChildrenFieldsGenerated(true);
   };
 
   // Start voice-guided form filling
@@ -269,38 +402,141 @@ function STRApplyPage() {
     const langCode = getUserLanguage();
     const prompts = getVoicePrompts(langCode);
     
-    speak(prompts.welcome, langCode);
-    
-    // After welcome, ask the first field
-    setTimeout(() => {
-      askCurrentField(0);
-    }, 3000);
+    // Speak welcome message and wait for it to finish before asking first field
+    speak(prompts.welcome, langCode, () => {
+      // This callback runs when welcome message finishes
+      setTimeout(() => {
+        askCurrentField(0);
+      }, 500); // Small 0.5s pause after welcome finishes
+    });
   };
 
-  // Ask the current field, skipping already-filled fields
+  // Get the form step number for a given field key
+  const getStepForField = (fieldKey) => {
+    if (fieldKey.startsWith('applicant.')) return 1;
+    if (fieldKey.startsWith('spouse.')) return 2;
+    if (fieldKey.startsWith('children[')) return 3;
+    if (fieldKey.startsWith('documents.')) return 4;
+    if (fieldKey.startsWith('guardian.')) return 5;
+    return 1; // Default to step 1
+  };
+
+  // Ask the current field, with smart skipping for pre-filled fields
   const askCurrentField = (fieldIdx) => {
     let idx = fieldIdx;
-    while (idx < formFields.length && getFieldValue(formFields[idx])) {
-      idx++;
+    const langCode = getUserLanguage();
+    const prompts = getVoicePrompts(langCode);
+    
+    // Find next field (check if pre-filled and conditional)
+    while (idx < formFields.length) {
+      const field = formFields[idx];
+      
+      // Check if we hit the children placeholder
+      if (field.key === '__children_placeholder__') {
+        if (!childrenFieldsGenerated) {
+          // Ask about children count
+          const childrenQuestion = {
+            en: 'Do you have children? If yes, how many? You can say a number from 0 to 5.',
+            ms: 'Adakah anda mempunyai anak? Jika ya, berapa ramai? Anda boleh sebut nombor dari 0 hingga 5.',
+            zh: '您有孩子吗？如果有，有几个？您可以说0到5之间的数字。',
+            hk: '你有仔女嗎？如果有，有幾個？你可以講0到5嘅數字。',
+            ta: 'உங்களுக்கு குழந்தைகள் உள்ளனரா? இருந்தால், எத்தனை பேர்? 0 முதல் 5 வரை சொல்லலாம்.'
+          };
+          speak(childrenQuestion[langCode] || childrenQuestion['en'], langCode);
+          setAwaitingChildrenCount(true);
+          setCurrentFieldIndex(idx);
+          return;
+        } else {
+          // Children fields already generated, skip placeholder
+          idx++;
+          continue;
+        }
+      }
+      
+      // Check conditional fields (e.g., spouse only if married)
+      if (field.conditional) {
+        if (field.conditional === 'married' && formData.applicant.marital_status !== 'married') {
+          // Skip spouse fields if not married
+          idx++;
+          continue;
+        }
+      }
+      
+      // Skip marriage certificate if not married
+      if (field.field === 'marriage_cert' && formData.applicant.marital_status !== 'married') {
+        idx++;
+        continue;
+      }
+      
+      // Auto-navigate to the correct form step for this field
+      const targetStep = getStepForField(field.key);
+      if (currentStep !== targetStep) {
+        setCurrentStep(targetStep);
+      }
+      
+      const currentValue = getFieldValue(field);
+      
+      // For boolean fields (documents), check if already answered
+      if (field.type === 'boolean') {
+        if (currentValue !== '' && currentValue !== undefined && currentValue !== null) {
+          // Already answered - skip unless user wants to change
+          const fieldLabel = field.label[langCode] || field.label['en'];
+          const valueText = currentValue ? 'Yes' : 'No';
+          const confirmPrompt = prompts.alreadyFilled
+            .replace('{field}', fieldLabel)
+            .replace('{value}', valueText);
+          speak(confirmPrompt, langCode);
+          setAwaitingChangeConfirmation(true);
+          setCurrentFieldIndex(idx);
+          return;
+        }
+        // Ask the boolean question directly (no value confirmation needed)
+        const fieldLabel = field.label[langCode] || field.label['en'];
+        speak(fieldLabel, langCode); // Question is already in the label
+        setAwaitingConfirmation(true); // Wait for Yes/No answer
+        setCurrentFieldIndex(idx);
+        return;
+      }
+      
+      if (currentValue) {
+        // Field already has value - ask if user wants to change it
+        const fieldLabel = field.label[langCode] || field.label['en'];
+        const confirmPrompt = prompts.alreadyFilled
+          .replace('{field}', fieldLabel)
+          .replace('{value}', currentValue);
+        speak(confirmPrompt, langCode);
+        setAwaitingChangeConfirmation(true);
+        setCurrentFieldIndex(idx);
+        return;
+      }
+      
+      // Field is empty - ask for it with progress indicator
+      const fieldLabel = field.label[langCode] || field.label['en'];
+      const totalFields = formFields.filter(f => f.key !== '__children_placeholder__').length;
+      const currentFieldNum = idx + 1;
+      
+      // Use progress prompt if available, otherwise fall back to basic
+      let prompt;
+      if (prompts.askFieldWithProgress) {
+        prompt = prompts.askFieldWithProgress
+          .replace('{current}', currentFieldNum.toString())
+          .replace('{total}', totalFields.toString())
+          .replace('{field}', fieldLabel);
+      } else {
+        prompt = prompts.askField.replace('{field}', fieldLabel);
+      }
+      speak(prompt, langCode);
+      setCurrentFieldIndex(idx);
+      return;
     }
+    
+    // All fields done - navigate to review step
     if (idx >= formFields.length) {
-      // All fields done
-      const langCode = getUserLanguage();
-      const prompts = getVoicePrompts(langCode);
+      setCurrentStep(6); // Move to review step
       speak(prompts.allDone, langCode);
       setCurrentFieldIndex(-1);
       setVoiceMode(false);
-      return;
     }
-
-    const field = formFields[idx];
-    const langCode = getUserLanguage();
-    const prompts = getVoicePrompts(langCode);
-    const fieldLabel = field.label[langCode] || field.label['en'];
-
-    const prompt = prompts.askField.replace('{field}', fieldLabel);
-    speak(prompt, langCode);
-    setCurrentFieldIndex(idx);
   };
 
   // Handle mic button press (single button for all fields)
@@ -329,11 +565,19 @@ function STRApplyPage() {
 
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-        // Convert webm to wav for backend compatibility
+        // Try to convert webm to wav for best compatibility, but fallback to webm if browser doesn't support decoding
         const convertToWav = async (blob) => {
           const arrayBuffer = await blob.arrayBuffer();
           const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Try to decode - this may fail on some browsers with webm/opus
+          let audioBuffer;
+          try {
+            audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          } catch (decodeError) {
+            console.warn('Browser cannot decode webm audio, sending as-is:', decodeError.message);
+            throw decodeError; // Will be caught and fallback to webm
+          }
           // Mono, 16kHz, PCM
           const numChannels = 1;
           const sampleRate = 16000;
@@ -386,15 +630,17 @@ function STRApplyPage() {
         };
 
         let wavBlob;
+        let fileName = 'recording.wav';
         try {
           wavBlob = await convertToWav(audioBlob);
         } catch (err) {
-          console.error('WAV conversion error:', err);
-          wavBlob = audioBlob; // fallback to webm if conversion fails
+          console.warn('WAV conversion failed, sending webm directly:', err.message);
+          wavBlob = audioBlob; // fallback to webm - Whisper can handle it
+          fileName = 'recording.webm';
         }
 
         const formDataToSend = new FormData();
-        formDataToSend.append('audio', wavBlob, 'recording.wav');
+        formDataToSend.append('audio', wavBlob, fileName);
         formDataToSend.append('language', getUserLanguage());
 
         try {
@@ -424,10 +670,10 @@ function STRApplyPage() {
 
       mediaRecorder.start();
       
-      // Auto-stop after 5 seconds
+      // Auto-stop after 8 seconds to allow for longer answers
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-      }, 5000);
+      }, 8000);
 
     } catch (err) {
       console.error('Microphone error:', err);
@@ -436,18 +682,155 @@ function STRApplyPage() {
   };
 
   // Handle the transcribed voice response
-  const handleVoiceResponse = (transcribed) => {
+  const handleVoiceResponse = async (transcribed) => {
     const langCode = getUserLanguage();
     const prompts = getVoicePrompts(langCode);
+    const lowerText = transcribed.toLowerCase();
     
-    if (awaitingConfirmation) {
-      // User is confirming or denying
-      const lowerText = transcribed.toLowerCase();
-      const isYes = lowerText.includes('ya') || lowerText.includes('yes') || lowerText.includes('是') || 
-                    lowerText.includes('係') || lowerText.includes('betul') || lowerText.includes('correct');
-      const isNo = lowerText.includes('tidak') || lowerText.includes('no') || lowerText.includes('否') || 
-                   lowerText.includes('唔係') || lowerText.includes('salah') || lowerText.includes('wrong');
+    // Check for Yes/No responses
+    const isYes = lowerText.includes('ya') || lowerText.includes('yes') || lowerText.includes('是') || 
+                  lowerText.includes('係') || lowerText.includes('betul') || lowerText.includes('correct') ||
+                  lowerText.includes('ஆமா') || lowerText.includes('சரி');
+    const isNo = lowerText.includes('tidak') || lowerText.includes('no') || lowerText.includes('否') || 
+                 lowerText.includes('唔係') || lowerText.includes('salah') || lowerText.includes('wrong') ||
+                 lowerText.includes('இல்லை') || lowerText.includes('வேண்டாம்');
+    
+    // Check for Skip command (multilingual)
+    const isSkip = lowerText.includes('skip') || lowerText.includes('langkau') || lowerText.includes('lewat') ||
+                   lowerText.includes('跳過') || lowerText.includes('跳过') || lowerText.includes('next') ||
+                   lowerText.includes('seterusnya') || lowerText.includes('下一個') || lowerText.includes('下一个') ||
+                   lowerText.includes('தவிர்') || lowerText.includes('அடுத்தது');
+    
+    // Handle skip command - move to next field
+    if (isSkip && !awaitingChildrenCount) {
+      const skipMsg = {
+        en: 'Okay, skipping this field.',
+        ms: 'Baiklah, melangkau medan ini.',
+        zh: '好的，跳过这个字段。',
+        hk: '好，跳過呢個欄位。',
+        ta: 'சரி, இந்த புலத்தைத் தவிர்க்கிறேன்.'
+      };
+      speak(skipMsg[langCode] || skipMsg['en'], langCode);
+      setAwaitingConfirmation(false);
+      setAwaitingChangeConfirmation(false);
+      setPendingValue(null);
+      setTimeout(() => {
+        askCurrentField(currentFieldIndex + 1);
+      }, 1500);
+      return;
+    }
+    
+    if (awaitingChildrenCount) {
+      // Extract number from transcription
+      const numbers = {
+        'zero': 0, 'kosong': 0, '零': 0, '〇': 0, 'சுழி': 0,
+        'one': 1, 'satu': 1, '一': 1, 'ஒன்று': 1,
+        'two': 2, 'dua': 2, '二': 2, '兩': 2, '两': 2, 'இரண்டு': 2,
+        'three': 3, 'tiga': 3, '三': 3, 'மூன்று': 3,
+        'four': 4, 'empat': 4, '四': 4, 'நான்கு': 4,
+        'five': 5, 'lima': 5, '五': 5, 'ஐந்து': 5
+      };
       
+      let count = 0;
+      
+      // Try to extract digit
+      const digitMatch = transcribed.match(/\d+/);
+      if (digitMatch) {
+        count = parseInt(digitMatch[0]);
+      } else {
+        // Try to match word
+        for (const [word, num] of Object.entries(numbers)) {
+          if (lowerText.includes(word) || transcribed.includes(word)) {
+            count = num;
+            break;
+          }
+        }
+      }
+      
+      // If user says no/zero, set 0
+      if (isNo || count === 0) {
+        count = 0;
+      }
+      
+      // Validate count (0-5)
+      count = Math.max(0, Math.min(5, count));
+      
+      setChildrenCount(count);
+      setAwaitingChildrenCount(false);
+      
+      if (count === 0) {
+        // No children, skip to documents
+        speak(prompts.confirmed, langCode);
+        generateChildrenFields(0); // Generate empty array
+        setTimeout(() => {
+          askCurrentField(currentFieldIndex + 1);
+        }, 1500);
+      } else {
+        // Generate children fields
+        const childMsg = {
+          en: `Okay, ${count} ${count === 1 ? 'child' : 'children'}. I'll ask for their details.`,
+          ms: `Baiklah, ${count} orang anak. Saya akan tanya butiran mereka.`,
+          zh: `好的，${count}个孩子。我会询问他们的详细信息。`,
+          hk: `好，${count}個仔女。我會問佢哋嘅資料。`,
+          ta: `சரி, ${count} குழந்தைகள். அவர்கள் விவரங்களை கேட்கிறேன்.`
+        };
+        speak(childMsg[langCode] || childMsg['en'], langCode);
+        
+        // Initialize children array in formData
+        const newChildren = Array(count).fill(null).map(() => ({ name: '', ic_number: '' }));
+        setFormData(prev => ({ ...prev, children: newChildren }));
+        
+        generateChildrenFields(count);
+        
+        setTimeout(() => {
+          askCurrentField(currentFieldIndex + 1);
+        }, 2000);
+      }
+      return;
+    }
+    
+    if (awaitingChangeConfirmation) {
+      // User is deciding whether to change a pre-filled field
+      if (isYes) {
+        // User wants to change it - ask for new value
+        const field = formFields[currentFieldIndex];
+        const fieldLabel = field.label[langCode] || field.label['en'];
+        const prompt = prompts.askField.replace('{field}', fieldLabel);
+        speak(prompt, langCode);
+        setAwaitingChangeConfirmation(false);
+      } else if (isNo) {
+        // User doesn't want to change it - skip to next field
+        speak(prompts.confirmed, langCode);
+        setAwaitingChangeConfirmation(false);
+        setTimeout(() => {
+          askCurrentField(currentFieldIndex + 1);
+        }, 1500);
+      }
+    } else if (awaitingConfirmation) {
+      // User is confirming the value they just provided OR answering a boolean question
+      const field = formFields[currentFieldIndex];
+      
+      // Handle boolean fields (documents) - Yes/No is the actual answer
+      if (field.type === 'boolean') {
+        if (isYes) {
+          setFieldValue(field, true);
+          speak(prompts.confirmed, langCode);
+          setAwaitingConfirmation(false);
+          setTimeout(() => {
+            askCurrentField(currentFieldIndex + 1);
+          }, 1500);
+        } else if (isNo) {
+          setFieldValue(field, false);
+          speak(prompts.confirmed, langCode);
+          setAwaitingConfirmation(false);
+          setTimeout(() => {
+            askCurrentField(currentFieldIndex + 1);
+          }, 1500);
+        }
+        return;
+      }
+      
+      // Handle regular fields - Yes/No confirms the pending value
       if (isYes && pendingValue) {
         // Confirm and save the value
         const field = formFields[currentFieldIndex];
@@ -455,10 +838,10 @@ function STRApplyPage() {
         // Handle marital status specially
         if (field.type === 'select') {
           const statusMap = {
-            'single': ['single', 'bujang', '单身', '單身'],
-            'married': ['married', 'berkahwin', '已婚', '已婚'],
-            'divorced': ['divorced', 'bercerai', '离婚', '離婚'],
-            'widowed': ['widowed', 'balu', 'duda', '丧偶', '喪偶']
+            'single': ['single', 'bujang', '单身', '單身', 'தனி'],
+            'married': ['married', 'berkahwin', '已婚', '已婚', 'திருமணமானவர்'],
+            'divorced': ['divorced', 'bercerai', '离婚', '離婚', 'விவாகரத்து'],
+            'widowed': ['widowed', 'balu', 'duda', '丧偶', '喪偶', 'விதவை']
           };
           let normalizedValue = 'single';
           for (const [status, keywords] of Object.entries(statusMap)) {
@@ -481,22 +864,59 @@ function STRApplyPage() {
           askCurrentField(currentFieldIndex + 1);
         }, 1500);
       } else if (isNo) {
-        // Retry
+        // Retry - ask the same question again
         speak(prompts.retry, langCode);
         setAwaitingConfirmation(false);
         setPendingValue(null);
         
         setTimeout(() => {
-          askCurrentField(currentFieldIndex);
+          const field = formFields[currentFieldIndex];
+          const fieldLabel = field.label[langCode] || field.label['en'];
+          const prompt = prompts.askField.replace('{field}', fieldLabel);
+          speak(prompt, langCode);
         }, 1500);
       }
     } else {
-      // User provided a value, ask for confirmation
-      setPendingValue(transcribed);
-      setAwaitingConfirmation(true);
+      // User provided a value - use Gemini to intelligently extract the field value
+      const field = formFields[currentFieldIndex];
+      const fieldName = field.label['en'] || field.field;
+      const fieldType = field.type || 'text';
       
-      const confirmPrompt = prompts.confirm.replace('{value}', transcribed);
-      speak(confirmPrompt, langCode);
+      try {
+        // Call Gemini to extract just the relevant value
+        const extractResponse = await fetch('http://localhost:8000/voice/extract-field', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: transcribed,
+            field_name: fieldName,
+            field_type: fieldType,
+            language: langCode
+          })
+        });
+        const extractResult = await extractResponse.json();
+        
+        // Use extracted value if successful, otherwise use original
+        const cleanValue = extractResult.success && extractResult.extracted 
+          ? extractResult.extracted 
+          : transcribed;
+        
+        console.log(`🧠 Extracted "${fieldName}": "${transcribed}" → "${cleanValue}"`);
+        
+        setPendingValue(cleanValue);
+        setAwaitingConfirmation(true);
+        
+        const confirmPrompt = prompts.confirm.replace('{value}', cleanValue);
+        speak(confirmPrompt, langCode);
+      } catch (err) {
+        // Fallback to original transcription if extraction fails
+        console.error('Field extraction error:', err);
+        setPendingValue(transcribed);
+        setAwaitingConfirmation(true);
+        
+        const confirmPrompt = prompts.confirm.replace('{value}', transcribed);
+        speak(confirmPrompt, langCode);
+      }
     }
   };
 
@@ -1025,22 +1445,24 @@ function STRApplyPage() {
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '30px' }}>
-          <button
-            onClick={() => navigate('/str')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: 'transparent',
-              border: 'none',
-              color: 'var(--primary-color)',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              marginBottom: '20px'
-            }}
-          >
-            <ChevronLeft size={20} /> {getLangCode() === 'ms' ? 'Kembali ke STR' : 'Back to STR'}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <button
+              onClick={() => navigate('/str')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'var(--primary-color)',
+                fontSize: '1rem',
+                cursor: 'pointer'
+              }}
+            >
+              <ChevronLeft size={20} /> {getLangCode() === 'ms' ? 'Kembali ke STR' : 'Back to STR'}
+            </button>
+            <LanguageToggle />
+          </div>
           <h1 style={{ fontSize: '2rem', color: '#1f2937', marginBottom: '10px' }}>
             {getLangCode() === 'ms' ? 'Permohonan STR' : 'STR Application'}
           </h1>
@@ -1211,12 +1633,14 @@ function STRApplyPage() {
             fontSize: '0.9rem'
           }}>
             {isListening 
-              ? (getLangCode() === 'ms' ? '🔴 Mendengar...' : getLangCode() === 'hk' ? '🔴 聽緊...' : '🔴 Listening...') 
+              ? (getLangCode() === 'ms' ? '🔴 Mendengar...' : getLangCode() === 'hk' ? '🔴 聽緊...' : getLangCode() === 'zh' ? '🔴 听着...' : '🔴 Listening...') 
               : isProcessing 
-              ? (getLangCode() === 'ms' ? '⏳ Memproses...' : getLangCode() === 'hk' ? '⏳ 處理緊...' : '⏳ Processing...')
+              ? (getLangCode() === 'ms' ? '⏳ Memproses...' : getLangCode() === 'hk' ? '⏳ 處理緊...' : getLangCode() === 'zh' ? '⏳ 处理中...' : '⏳ Processing...')
+              : awaitingChangeConfirmation
+              ? (getLangCode() === 'ms' ? '🔄 Tukar? Ya/Tidak' : getLangCode() === 'hk' ? '🔄 改? 係/唔係' : getLangCode() === 'zh' ? '🔄 改吗? 是/否' : '🔄 Change? Yes/No')
               : awaitingConfirmation
-              ? (getLangCode() === 'ms' ? '🎤 Ya / Tidak?' : getLangCode() === 'hk' ? '🎤 係 / 唔係?' : '🎤 Yes / No?')
-              : (getLangCode() === 'ms' ? '🎤 Tekan untuk bercakap' : getLangCode() === 'hk' ? '🎤 撳嚟講嘢' : '🎤 Press to speak')}
+              ? (getLangCode() === 'ms' ? '✓ Betul? Ya/Tidak' : getLangCode() === 'hk' ? '✓ 啱? 係/唔係' : getLangCode() === 'zh' ? '✓ 对吗? 是/否' : '✓ Correct? Yes/No')
+              : (getLangCode() === 'ms' ? '🎤 Tekan dan tahan' : getLangCode() === 'hk' ? '🎤 撳住嚟講' : getLangCode() === 'zh' ? '🎤 按住说话' : '🎤 Hold to speak')}
           </p>
         </div>
       )}

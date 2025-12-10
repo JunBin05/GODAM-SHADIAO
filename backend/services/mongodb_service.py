@@ -7,6 +7,7 @@ from typing import Optional, Dict, List, Any
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection
+from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure, NetworkTimeout
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -15,33 +16,79 @@ load_dotenv()
 # MongoDB client instance
 _client: Optional[MongoClient] = None
 _db: Optional[Database] = None
+_connection_failed: bool = False  # Track if connection has failed to avoid repeated blocking
 
 def get_db() -> Database:
     """Get or initialize MongoDB database instance"""
-    global _client, _db
+    global _client, _db, _connection_failed
+    
+    # If we've already failed, don't retry (prevents repeated 20s blocks)
+    if _connection_failed and _db is None:
+        raise ConnectionFailure("MongoDB connection previously failed. Restart server to retry.")
+    
     if _db is None:
         # Get MongoDB URI from environment
         mongo_uri = os.getenv('MONGODB_URI')
         if not mongo_uri:
             raise ValueError("MONGODB_URI not found in environment variables")
         
-        # Initialize MongoDB client with timeout settings
-        _client = MongoClient(
-            mongo_uri,
-            serverSelectionTimeoutMS=5000,  # 5 second timeout
-            connectTimeoutMS=5000,
-            socketTimeoutMS=5000
-        )
-        _db = _client['godam_shadiao']  # Database name
-        
-        print("✓ MongoDB Atlas connected successfully")
-        print(f"  Database: {_db.name}")
+        try:
+            # Initialize MongoDB client with shorter timeout settings
+            _client = MongoClient(
+                mongo_uri,
+                serverSelectionTimeoutMS=3000,  # 3 second timeout (reduced from 5)
+                connectTimeoutMS=3000,
+                socketTimeoutMS=3000,
+                retryWrites=True,
+                retryReads=True
+            )
+            _db = _client['godam_shadiao']  # Database name
+            
+            # Test the connection
+            _db.command('ping')
+            
+            print("✓ MongoDB Atlas connected successfully")
+            print(f"  Database: {_db.name}")
+        except (ServerSelectionTimeoutError, ConnectionFailure, NetworkTimeout) as e:
+            _connection_failed = True
+            _db = None
+            _client = None
+            print(f"❌ MongoDB connection failed: {e}")
+            print("   Server will continue without MongoDB. User data endpoints will use mock data.")
+            raise
     
     return _db
 
 
+def is_connected() -> bool:
+    """Check if MongoDB is connected and healthy"""
+    global _db, _connection_failed
+    if _connection_failed or _db is None:
+        return False
+    try:
+        _db.command('ping')
+        return True
+    except Exception:
+        return False
+
+
+def safe_db_operation(func):
+    """Decorator for safe MongoDB operations that won't crash on connection failure"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (ServerSelectionTimeoutError, ConnectionFailure, NetworkTimeout) as e:
+            print(f"⚠️ MongoDB operation failed (connection issue): {e}")
+            return None
+        except Exception as e:
+            print(f"⚠️ MongoDB operation failed: {e}")
+            return None
+    return wrapper
+
+
 # ============ USER OPERATIONS ============
 
+@safe_db_operation
 def get_user_by_id(user_id: str) -> Optional[Dict]:
     """Get user by user_id (IC number is the _id)"""
     db = get_db()
@@ -54,7 +101,8 @@ def get_user_by_ic(ic: str) -> Optional[Dict]:
     return get_user_by_id(ic)
 
 
-def create_user(user_data: Dict) -> str:
+@safe_db_operation
+def create_user(user_data: Dict) -> Optional[str]:
     """Create a new user. IC number should be in user_data as 'ic' or use as _id"""
     db = get_db()
     
@@ -74,6 +122,7 @@ def create_user(user_data: Dict) -> str:
     return ic
 
 
+@safe_db_operation
 def update_user(user_id: str, update_data: Dict) -> bool:
     """Update user data"""
     db = get_db()
@@ -84,6 +133,7 @@ def update_user(user_id: str, update_data: Dict) -> bool:
     return result.modified_count > 0
 
 
+@safe_db_operation
 def delete_user(user_id: str) -> bool:
     """Delete a user"""
     db = get_db()
@@ -91,6 +141,7 @@ def delete_user(user_id: str) -> bool:
     return result.deleted_count > 0
 
 
+@safe_db_operation
 def user_exists(ic: str) -> bool:
     """Check if user exists"""
     db = get_db()
@@ -99,13 +150,15 @@ def user_exists(ic: str) -> bool:
 
 # ============ FINANCIAL AID OPERATIONS ============
 
+@safe_db_operation
 def get_financial_aid(ic: str) -> Optional[Dict]:
     """Get financial aid data by IC"""
     db = get_db()
     return db.financialAid.find_one({"_id": ic})
 
 
-def create_financial_aid(ic: str, aid_data: Dict) -> str:
+@safe_db_operation
+def create_financial_aid(ic: str, aid_data: Dict) -> Optional[str]:
     """Create financial aid record"""
     db = get_db()
     doc = aid_data.copy()
@@ -114,6 +167,7 @@ def create_financial_aid(ic: str, aid_data: Dict) -> str:
     return ic
 
 
+@safe_db_operation
 def update_financial_aid(ic: str, update_data: Dict) -> bool:
     """Update financial aid data"""
     db = get_db()
@@ -126,6 +180,7 @@ def update_financial_aid(ic: str, update_data: Dict) -> bool:
 
 # ============ STORE OPERATIONS ============
 
+@safe_db_operation
 def get_stores_by_location(lat: float, lng: float, radius_km: float = 5, limit: int = 10) -> List[Dict]:
     """Get stores near a location (KL area only)"""
     db = get_db()
@@ -142,13 +197,15 @@ def get_stores_by_location(lat: float, lng: float, radius_km: float = 5, limit: 
     return stores
 
 
+@safe_db_operation
 def get_all_stores(limit: int = 100) -> List[Dict]:
     """Get all stores (limited to KL area)"""
     db = get_db()
     return list(db.stores.find().limit(limit))
 
 
-def create_store(store_data: Dict) -> str:
+@safe_db_operation
+def create_store(store_data: Dict) -> Optional[str]:
     """Create a new store"""
     db = get_db()
     result = db.stores.insert_one(store_data)
@@ -157,6 +214,7 @@ def create_store(store_data: Dict) -> str:
 
 # ============ TRANSACTION OPERATIONS ============
 
+@safe_db_operation
 def get_user_transactions(user_id: str, limit: int = 50) -> List[Dict]:
     """Get user transactions"""
     db = get_db()
@@ -165,7 +223,8 @@ def get_user_transactions(user_id: str, limit: int = 50) -> List[Dict]:
     ).sort("date", -1).limit(limit))
 
 
-def create_transaction(transaction_data: Dict) -> str:
+@safe_db_operation
+def create_transaction(transaction_data: Dict) -> Optional[str]:
     """Create a new transaction"""
     db = get_db()
     result = db.transactions.insert_one(transaction_data)
@@ -174,19 +233,22 @@ def create_transaction(transaction_data: Dict) -> str:
 
 # ============ REMINDER OPERATIONS ============
 
+@safe_db_operation
 def get_user_reminders(user_id: str) -> List[Dict]:
     """Get user reminders"""
     db = get_db()
     return list(db.reminders.find({"userId": user_id}))
 
 
-def create_reminder(reminder_data: Dict) -> str:
+@safe_db_operation
+def create_reminder(reminder_data: Dict) -> Optional[str]:
     """Create a new reminder"""
     db = get_db()
     result = db.reminders.insert_one(reminder_data)
     return str(result.inserted_id)
 
 
+@safe_db_operation
 def update_reminder(reminder_id: str, update_data: Dict) -> bool:
     """Update a reminder"""
     db = get_db()
@@ -198,6 +260,7 @@ def update_reminder(reminder_id: str, update_data: Dict) -> bool:
     return result.modified_count > 0
 
 
+@safe_db_operation
 def delete_reminder(reminder_id: str) -> bool:
     """Delete a reminder"""
     db = get_db()
@@ -208,6 +271,7 @@ def delete_reminder(reminder_id: str) -> bool:
 
 # ============ TRANSLATION OPERATIONS ============
 
+@safe_db_operation
 def get_translations() -> Dict:
     """Get all translations"""
     db = get_db()
@@ -219,6 +283,7 @@ def get_translations() -> Dict:
     return {}
 
 
+@safe_db_operation
 def update_translations(translations: Dict) -> bool:
     """Update translations"""
     db = get_db()
@@ -265,7 +330,8 @@ def get_face_embedding(ic: str) -> Optional[List[float]]:
 
 # ============ VOICE EMBEDDING OPERATIONS ============
 
-def save_voice_embedding(ic: str, embedding: List[float]) -> bool:
+@safe_db_operation
+def save_voice_embedding(ic: str, embedding: List[float], name: str = None) -> bool:
     """Save voice embedding to user document"""
     db = get_db()
     
@@ -273,6 +339,8 @@ def save_voice_embedding(ic: str, embedding: List[float]) -> bool:
     user = db.users.find_one({"_id": ic})
     
     update_data = {"voiceEmbedding": embedding}
+    if name:
+        update_data["name"] = name
     
     if user:
         # Update existing user
@@ -285,12 +353,15 @@ def save_voice_embedding(ic: str, embedding: List[float]) -> bool:
         # Create new user
         db.users.insert_one({
             "_id": ic,
+            "name": name if name else "Unknown",
             "voiceEmbedding": embedding,
             "created_date": "2024-12-10"
         })
         return True
+        return True
 
 
+@safe_db_operation
 def load_voice_embedding(ic: str) -> Optional[List[float]]:
     """Load voice embedding from user document"""
     db = get_db()
