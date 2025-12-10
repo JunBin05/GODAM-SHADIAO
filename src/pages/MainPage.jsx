@@ -7,22 +7,47 @@ import FamilyDock from '../components/FamilyDock';
 import QRCodeModal from '../components/QRCodeModal';
 import { myKasihData } from '../data/mockMyKasihData';
 import { strData } from '../data/mockStrData';
+import { useVoiceNavigation } from '../hooks/useVoiceNavigation';
 
 const MainPage = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [userData, setUserData] = useState(null);
   const [requests, setRequests] = useState([]);
   const [reminders, setReminders] = useState({ myKasih: null, sara: null, str: null });
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
-  const recognitionRef = useRef(null);
+  // Get IC from localStorage immediately (for voice navigation)
+  const getStoredIc = () => {
+    try {
+      const storedUser = localStorage.getItem('registeredUser');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        return user.icNumber;
+      }
+    } catch (e) {
+      console.error('Error getting stored IC:', e);
+    }
+    return null;
+  };
+
+  // Use Python voice navigation instead of browser speech recognition
+  const {
+    isListening,
+    isProcessing,
+    transcript,
+    aiResponse,
+    startListening,
+    stopListening,
+    error: voiceError,
+  } = useVoiceNavigation(getStoredIc(), (route) => {
+    // Navigate to the route returned by voice AI
+    console.log('🚀 Voice navigation to:', route);
+    navigate(route);
+  });
+
   const synthRef = useRef(window.speechSynthesis);
 
   // Helper for days left
@@ -89,122 +114,7 @@ const MainPage = () => {
     }
   }, []);
 
-  // Initialize Speech Recognition
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      
-      // Map app language to speech language
-      const langMap = {
-        'en': 'en-US',
-        'ms': 'ms-MY',
-        'zh': 'zh-CN',
-        'ta': 'ta-IN'
-      };
-      recognitionRef.current.lang = langMap[language] || 'en-US';
-
-      recognitionRef.current.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-        setTranscript(text);
-        handleAIResponse(text);
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
-    }
-  }, [language]);
-
-  const handleAIResponse = (text) => {
-    // Mock AI Logic
-    let response = "";
-    const lowerText = text.toLowerCase();
-
-    if (lowerText.includes('money') || lowerText.includes('duit') || lowerText.includes('wang') || lowerText.includes('cash')) {
-      response = t('aiCheckStr');
-    } else if (lowerText.includes('help') || lowerText.includes('tolong') || lowerText.includes('bantu')) {
-      response = t('aiHelp');
-    } else if (lowerText.includes('register') || lowerText.includes('daftar')) {
-      response = t('aiRegistered');
-    } else {
-      response = t('aiDefault').replace('{text}', text);
-    }
-
-    setAiResponse(response);
-    speak(response);
-  };
-
-  const speak = (text) => {
-    if (synthRef.current.speaking) {
-      synthRef.current.cancel();
-    }
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Map app language to speech voice language
-    const langMap = {
-      'en': 'en-US',
-      'ms': 'ms-MY',
-      'zh': 'zh-CN',
-      'ta': 'ta-IN'
-    };
-    utterance.lang = langMap[language] || 'en-US';
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-
-    synthRef.current.speak(utterance);
-  };
-
-  const startListening = (e) => {
-    // Prevent default behavior to avoid scrolling/context menu/selection
-    if (e.cancelable) {
-      e.preventDefault();
-    }
-    
-    // Capture pointer to ensure we get the up event even if they move slightly off
-    if (e.target.setPointerCapture) {
-      try {
-        e.target.setPointerCapture(e.pointerId);
-      } catch (err) {
-        console.error("Pointer capture error:", err);
-      }
-    }
-
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error("Start error:", err);
-      }
-    } else {
-      alert("Speech recognition not supported in this browser.");
-    }
-  };
-
-  const stopListening = (e) => {
-    if (e.target.releasePointerCapture) {
-      try {
-        e.target.releasePointerCapture(e.pointerId);
-      } catch (err) {
-        console.error("Pointer release error:", err);
-      }
-    }
-    
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
-  };
+  // No need for speech recognition initialization - using Python backend now!
 
   return (
     <div className="page-container main-page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -452,40 +362,86 @@ const MainPage = () => {
             padding: '6px 12px',
             borderRadius: '20px',
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            opacity: isListening ? 1 : 0, 
+            opacity: (isListening || isProcessing) ? 1 : 0, 
             transition: 'opacity 0.2s',
             pointerEvents: 'none'
           }}>
-            {isListening ? t('listening') : t('pressToTalk')}
+            {isListening ? 'Recording...' : isProcessing ? 'Processing...' : t('pressToTalk')}
           </p>
           
           <button
-            onPointerDown={startListening}
-            onPointerUp={stopListening}
-            onPointerLeave={stopListening}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              if (e.target.setPointerCapture) {
+                try {
+                  e.target.setPointerCapture(e.pointerId);
+                } catch (err) {
+                  console.error("Pointer capture error:", err);
+                }
+              }
+              startListening();
+            }}
+            onPointerUp={(e) => {
+              if (e.target.releasePointerCapture) {
+                try {
+                  e.target.releasePointerCapture(e.pointerId);
+                } catch (err) {}
+              }
+              stopListening();
+            }}
+            onPointerLeave={(e) => {
+              if (e.target.releasePointerCapture) {
+                try {
+                  e.target.releasePointerCapture(e.pointerId);
+                } catch (err) {}
+              }
+              stopListening();
+            }}
             onContextMenu={(e) => e.preventDefault()}
+            disabled={isProcessing}
             style={{
               touchAction: 'none',
               width: '110px', // Much larger
               height: '110px',
               borderRadius: '50%',
-              backgroundColor: isListening ? '#ef4444' : 'var(--primary-color)',
+              backgroundColor: isListening ? '#ef4444' : isProcessing ? '#f59e0b' : 'var(--primary-color)',
               border: '6px solid #f3f4f6',
               boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
+              cursor: isProcessing ? 'wait' : 'pointer',
               transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
               transform: isListening ? 'scale(1.05)' : 'scale(1.2) translateY(-25px)', // Pop out effect
               touchAction: 'none', // Critical for mobile: prevents scrolling/gestures
               userSelect: 'none', // Prevents text selection
               WebkitUserSelect: 'none',
-              WebkitTouchCallout: 'none' // Prevents iOS context menu
+              WebkitTouchCallout: 'none', // Prevents iOS context menu
+              opacity: isProcessing ? 0.7 : 1
             }}
           >
             <Mic size={55} color="white" />
           </button>
+          
+          {/* Error message */}
+          {voiceError && (
+            <p style={{
+              position: 'absolute',
+              bottom: '-50px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 'max-content',
+              maxWidth: '300px',
+              fontSize: '0.8rem',
+              color: '#ef4444',
+              backgroundColor: '#fee2e2',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              {voiceError}
+            </p>
+          )}
         </div>
 
         {/* Right Button: STR */}

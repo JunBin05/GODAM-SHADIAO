@@ -44,9 +44,38 @@ TTS_VOICE_MAP = {
 # ==========================================
 # 1. CONFIGURATION
 # ==========================================
-# ⚠️ REPLACE WITH YOUR ACTUAL KEY
-GOOGLE_API_KEY = "AIzaSyDkpD-MI3V0lR28euQxK521Jq-QTjDLGdc"
+import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables from .env file
+# Find .env in current dir or parent directories
+env_path = Path(__file__).parent.parent / ".env"
+if not env_path.exists():
+    env_path = Path(".env")
+load_dotenv(env_path)
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not found in environment variables. Please set it in .env file.")
 genai.configure(api_key=GOOGLE_API_KEY)
+
+# Frontend URL Configuration
+FRONTEND_URL = "http://localhost:5174"  # Adjust if needed
+
+# Page navigation mappings
+PAGE_ROUTES = {
+    "str": "/str",
+    "str_status": "/str",
+    "str_balance": "/str",
+    "str_apply": "/str-apply",
+    "mykasih": "/sara",
+    "sara": "/sara",
+    "mykasih_balance": "/sara",
+    "reminders": "/reminders",
+    "main": "/main",
+    "home": "/main",
+}
 
 # Firebase Setup
 db = None
@@ -100,12 +129,18 @@ print("✅ Whisper Model Ready")
 session_state = {
     "step": "IDLE",
     "temp_data": {},
-    "last_action": None
+    "last_action": None,
+    "pending_navigation": None  # Store page to navigate to
 }
 
 def reset_session():
     global session_state
-    session_state = {"step": "IDLE", "temp_data": {}, "last_action": None}
+    session_state = {
+        "step": "IDLE", 
+        "temp_data": {}, 
+        "last_action": None,
+        "pending_navigation": None
+    }
 
 def call_gemini_safe(prompt, system_instruction=None, retries=3):
     """
@@ -154,11 +189,33 @@ def get_financial_aid_data(ic_number):
 # 5. ROUTER & EXTRACTION
 # ==========================================
 ACTION_MENU = [
-    {"action_id": "check_str_status", "desc": "User asks about STR/Sumbangan Tunai status."},
-    {"action_id": "check_mykasih_balance", "desc": "User asks about MyKasih/SARA balance."},
-    {"action_id": "initiate_add_rep", "desc": "User wants to AUTHORIZE someone (child/daughter) to use their ID/money."},
-    {"action_id": "unknown", "desc": "Unrelated topic."}
+    {"action_id": "check_str_status", "desc": "User asks about STR/Sumbangan Tunai status.", "navigate_to": "str"},
+    {"action_id": "check_mykasih_balance", "desc": "User asks about MyKasih/SARA balance.", "navigate_to": "sara"},
+    {"action_id": "apply_str", "desc": "User wants to apply for STR.", "navigate_to": "str_apply"},
+    {"action_id": "check_reminders", "desc": "User asks about reminders or appointments.", "navigate_to": "reminders"},
+    {"action_id": "go_home", "desc": "User wants to go to main page/home.", "navigate_to": "main"},
+    {"action_id": "initiate_add_rep", "desc": "User wants to AUTHORIZE someone (child/daughter) to use their ID/money.", "navigate_to": None},
+    {"action_id": "unknown", "desc": "Unrelated topic.", "navigate_to": None}
 ]
+
+def open_browser_page(page_key):
+    """Open browser to specific frontend page"""
+    import webbrowser
+    
+    route = PAGE_ROUTES.get(page_key)
+    if not route:
+        print(f"⚠️ Unknown page: {page_key}")
+        return False
+    
+    url = f"{FRONTEND_URL}{route}"
+    print(f"\n🌐 Opening browser to: {url}")
+    
+    try:
+        webbrowser.open(url)
+        return True
+    except Exception as e:
+        print(f"❌ Failed to open browser: {e}")
+        return False
 
 def ask_gemini_brain(user_text):
     global session_state
@@ -169,7 +226,12 @@ def ask_gemini_brain(user_text):
         Act as a classifier. Map user text to ONE action_id from: {json.dumps(ACTION_MENU)}.
         RULES:
         1. "anak perempuan", "memberikan", "benarkan", "authorize", "guna wang", "use money" -> initiate_add_rep
-        2. Output JSON ONLY: {{ "action_id": "..." }}
+        2. "check STR", "STR status", "STR balance", "Sumbangan Tunai" -> check_str_status
+        3. "check MyKasih", "SARA", "MyKasih balance" -> check_mykasih_balance
+        4. "apply STR", "mohon STR" -> apply_str
+        5. "reminders", "appointments", "temujanji" -> check_reminders
+        6. "home", "main page", "balik" -> go_home
+        Output JSON ONLY: {{ "action_id": "..." }}
         """
     elif step == "ASK_IC":
         sys_prompt = "Extract IC number (digits only). Output JSON: { 'extracted_ic': '123456...' }"
@@ -177,6 +239,12 @@ def ask_gemini_brain(user_text):
         sys_prompt = "Did user confirm (Yes/Betul) or deny (No/Salah)? Output JSON: { 'confirmation': true/false }"
     elif step == "ASK_AMOUNT":
         sys_prompt = "Extract amount (number only). Output JSON: { 'extracted_amount': 100 }"
+    elif step == "ASK_NAVIGATION":
+        sys_prompt = """
+        User is asked if they want to navigate to a page.
+        Did they say YES (ya/ok/betul/yes/sure/boleh) or NO (tidak/no/taknak)?
+        Output JSON: { 'navigate_confirmed': true/false }
+        """
     else:
         sys_prompt = "Output JSON: {}"
 
@@ -199,15 +267,131 @@ def run_agent_logic(user_text, user_ic="900101012345"):
     profile = get_profile_data(user_ic)
     lang = profile.get('language', 'BM')
 
+    # Language-specific messages
+    navigation_prompts = {
+        "BM": {
+            "ask": "Adakah anda mahu pergi ke halaman {page}?",
+            "opening": "Membuka halaman {page}...",
+            "cancelled": "Baiklah, tidak buka halaman.",
+        },
+        "BC": {
+            "ask": "你要去{page}页面吗？",
+            "opening": "正在打开{page}页面...",
+            "cancelled": "好的，不打开页面。",
+        },
+        "BI": {
+            "ask": "Would you like to go to the {page} page?",
+            "opening": "Opening {page} page...",
+            "cancelled": "Okay, not opening the page.",
+        }
+    }
+
+    page_names = {
+        "str": {"BM": "STR", "BC": "STR", "BI": "STR"},
+        "sara": {"BM": "MyKasih", "BC": "MyKasih", "BI": "MyKasih"},
+        "str_apply": {"BM": "Permohonan STR", "BC": "STR申请", "BI": "STR Application"},
+        "reminders": {"BM": "Peringatan", "BC": "提醒", "BI": "Reminders"},
+        "main": {"BM": "Utama", "BC": "主页", "BI": "Home"},
+    }
+
+    prompts = navigation_prompts.get(lang, navigation_prompts["BM"])
+
+    # Handle navigation confirmation
+    if step == "ASK_NAVIGATION":
+        navigate_confirmed = decision.get("navigate_confirmed", False)
+        pending_page = session_state["pending_navigation"]
+        
+        if navigate_confirmed:
+            page_name = page_names.get(pending_page, {}).get(lang, pending_page.upper())
+            session_state["step"] = "IDLE"
+            session_state["pending_navigation"] = None
+            
+            # Open browser
+            success = open_browser_page(pending_page)
+            if success:
+                return {
+                    "reply": prompts["opening"].format(page=page_name),
+                    "lang": lang,
+                    "continue_conversation": False
+                }
+            else:
+                return {
+                    "reply": "Maaf, tidak dapat membuka halaman.",
+                    "lang": lang,
+                    "continue_conversation": False
+                }
+        else:
+            session_state["step"] = "IDLE"
+            session_state["pending_navigation"] = None
+            return {
+                "reply": prompts["cancelled"],
+                "lang": lang,
+                "continue_conversation": False
+            }
+
+    # Handle main actions
     if step == "IDLE":
         action = decision.get("action_id")
+        
+        # Find action details
+        action_info = next((a for a in ACTION_MENU if a["action_id"] == action), None)
+        navigate_to = action_info.get("navigate_to") if action_info else None
+        
+        # Handle different actions
         if action == "initiate_add_rep":
             session_state["step"] = "ASK_IC"
             return {"reply": "Boleh. Sila berikan nombor Kad Pengenalan anak anda?", "lang": lang, "continue_conversation": True}
+        
         elif action == "check_str_status":
-            return {"reply": "Permohonan STR anda lulus. Bayaran seterusnya RM200.", "lang": lang, "continue_conversation": False}
+            aid_data = get_financial_aid_data(user_ic)
+            if aid_data.get("str_eligible"):
+                next_payment = aid_data.get("str_nextPayAmount", 200)
+                reply = f"Permohonan STR anda lulus. Bayaran seterusnya RM{next_payment}."
+            else:
+                reply = "Permohonan STR anda masih dalam proses."
+            
+            # Ask if want to navigate
+            if navigate_to:
+                page_name = page_names.get(navigate_to, {}).get(lang, "STR")
+                session_state["step"] = "ASK_NAVIGATION"
+                session_state["pending_navigation"] = navigate_to
+                reply += f" {prompts['ask'].format(page=page_name)}"
+                return {"reply": reply, "lang": lang, "continue_conversation": True}
+            
+            return {"reply": reply, "lang": lang, "continue_conversation": False}
+        
         elif action == "check_mykasih_balance":
-            return {"reply": "Baki MyKasih anda tinggal RM50.", "lang": lang, "continue_conversation": False}
+            aid_data = get_financial_aid_data(user_ic)
+            balance = aid_data.get("mykasih_balance_not_expire", 50)
+            reply = f"Baki MyKasih anda tinggal RM{balance}."
+            
+            # Ask if want to navigate
+            if navigate_to:
+                page_name = page_names.get(navigate_to, {}).get(lang, "MyKasih")
+                session_state["step"] = "ASK_NAVIGATION"
+                session_state["pending_navigation"] = navigate_to
+                reply += f" {prompts['ask'].format(page=page_name)}"
+                return {"reply": reply, "lang": lang, "continue_conversation": True}
+            
+            return {"reply": reply, "lang": lang, "continue_conversation": False}
+        
+        elif action in ["apply_str", "check_reminders", "go_home"]:
+            # Direct navigation actions
+            if navigate_to:
+                page_name = page_names.get(navigate_to, {}).get(lang, navigate_to.upper())
+                session_state["step"] = "ASK_NAVIGATION"
+                session_state["pending_navigation"] = navigate_to
+                
+                if action == "apply_str":
+                    reply = "Anda boleh mohon STR di halaman permohonan."
+                elif action == "check_reminders":
+                    reply = "Anda ada 2 peringatan."
+                else:
+                    reply = "Baiklah, kembali ke halaman utama."
+                
+                reply += f" {prompts['ask'].format(page=page_name)}"
+                return {"reply": reply, "lang": lang, "continue_conversation": True}
+        
         return {"reply": "Maaf, saya hanya boleh bantu urusan STR dan MyKasih.", "lang": lang, "continue_conversation": False}
 
     elif step == "ASK_IC":

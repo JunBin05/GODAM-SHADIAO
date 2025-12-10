@@ -19,12 +19,22 @@ from gtts import gTTS
 from IPython.display import Audio, display, HTML
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 from google.colab import output
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables from .env file
+# Find .env in current dir or parent directories
+env_path = Path(__file__).parent.parent / ".env"
+if not env_path.exists():
+    env_path = Path(".env")
+load_dotenv(env_path)
 
 # ==========================================
 # 2. CONFIGURATION
 # ==========================================
-# ⚠️ REPLACE WITH YOUR ACTUAL KEY
-GOOGLE_API_KEY = "AIzaSyDkpD-MI3V0lR28euQxK521Jq-QTjDLGdc"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not found in environment variables. Please set it in .env file.")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Firebase Setup
