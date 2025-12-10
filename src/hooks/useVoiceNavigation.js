@@ -271,18 +271,36 @@ export const useVoiceNavigation = (userIcNumber, onNavigate) => {
     const utterance = new SpeechSynthesisUtterance(text);
     
     // Map language codes to speech synthesis voices
+    // HK = Cantonese (zh-HK), BC = Mandarin Chinese (zh-CN)
     const langMap = {
       'BM': 'ms-MY',
       'BC': 'zh-CN',
       'BI': 'en-US',
+      'HK': 'zh-HK',  // Cantonese
       'ms': 'ms-MY',
       'zh': 'zh-CN',
-      'en': 'en-US'
+      'en': 'en-US',
+      'yue': 'zh-HK'  // Alternative Cantonese code
     };
     
     utterance.lang = langMap[langCode] || 'en-US';
     utterance.rate = 0.9;
     utterance.pitch = 1.0;
+    
+    // Try to find a specific voice for Cantonese if available
+    if (langCode === 'HK' || langCode === 'yue') {
+      const voices = synthRef.current.getVoices();
+      const cantoneseVoice = voices.find(v => 
+        v.lang === 'zh-HK' || 
+        v.lang.includes('yue') || 
+        v.name.toLowerCase().includes('cantonese') ||
+        v.name.toLowerCase().includes('hong kong')
+      );
+      if (cantoneseVoice) {
+        utterance.voice = cantoneseVoice;
+        console.log('🗣️ Using Cantonese voice:', cantoneseVoice.name);
+      }
+    }
 
     synthRef.current.speak(utterance);
   };

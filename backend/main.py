@@ -78,6 +78,40 @@ async def get_user_by_ic(ic: str):
     return {"success": False, "detail": "User not found. Try 'test' or 'demo' for testing."}
 
 
+# Full user profile endpoint for forms (returns all fields including family)
+@app.get("/api/auth/user/{ic}")
+async def get_full_user_profile(ic: str):
+    """Get complete user profile for form pre-filling including family data"""
+    from services.mongodb_service import get_user_by_id
+    
+    try:
+        user = get_user_by_id(ic)
+        
+        if user:
+            # Return full user data for form pre-filling
+            return {
+                "success": True,
+                "data": {
+                    "ic": ic,
+                    "name": user.get('name', ''),
+                    "preferred_language": user.get('preferred_language', 'en'),
+                    "monthly_income": user.get('monthly_income'),
+                    "marital_status": user.get('marital_status', 'single'),
+                    "state": user.get('state', ''),
+                    "spouse": user.get('spouse'),
+                    "children": user.get('children', []),
+                    "guardian": user.get('guardian'),
+                    "hasVoice": bool(user.get('voiceEmbedding')),
+                    "hasFace": bool(user.get('face_embedding'))
+                }
+            }
+    except Exception as e:
+        print(f"Error loading user profile: {e}")
+        return {"success": False, "detail": str(e)}
+    
+    return {"success": False, "detail": "User not found"}
+
+
 # Simple user registration endpoint for frontend
 @app.post("/user/register")
 async def simple_register(request: dict):

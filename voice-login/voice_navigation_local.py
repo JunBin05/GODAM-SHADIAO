@@ -578,26 +578,40 @@ def record_until_silence(sample_rate=SAMPLE_RATE, silence_threshold=0.005, silen
 # ==========================================
 # 8. SPEECH-TO-TEXT (SAME MODEL)
 # ==========================================
-def transcribe_audio(audio_data, sample_rate=SAMPLE_RATE):
-    """Transcribe audio using Malaysian Whisper model"""
+import threading
+
+transcribe_lock = threading.Lock()
+
+def transcribe_audio(audio_data, sample_rate=SAMPLE_RATE, user_lang=None):
+    """Transcribe audio using Whisper model (thread-safe, dynamic language)"""
     print("🧠 Transcribing...")
-    
-    # Prepare input
-    inputs = processor(
-        audio_data, 
-        sampling_rate=sample_rate, 
-        return_tensors="pt"
-    ).input_features.to(device).to(torch_dtype)
-    
-    # Generate transcription
-    gen_ids = whisper_model.generate(
-        inputs, 
-        language="ms", 
-        task="transcribe", 
-        max_new_tokens=400
-    )
-    
-    text = processor.batch_decode(gen_ids, skip_special_tokens=True)[0]
+    with transcribe_lock:
+        # Prepare input
+        inputs = processor(
+            audio_data, 
+            sampling_rate=sample_rate, 
+            return_tensors="pt"
+        )
+        input_features = inputs.input_features.to(device).to(torch_dtype)
+        attention_mask = inputs.get('attention_mask', None)
+        # Choose language
+        lang = user_lang or 'ms'
+        if lang.lower() in ['hk', 'zh', 'cantonese', 'mandarin', 'bc']:
+            whisper_lang = 'zh'
+        elif lang.lower() in ['en', 'bi', 'english']:
+            whisper_lang = 'en'
+        else:
+            whisper_lang = 'ms'
+        # Generate transcription
+        gen_ids = whisper_model.generate(
+            input_features,
+            attention_mask=attention_mask,
+            language=whisper_lang,
+            task="transcribe",
+            max_new_tokens=400
+        )
+        
+        text = processor.batch_decode(gen_ids, skip_special_tokens=True)[0]
     return text
 
 # ==========================================

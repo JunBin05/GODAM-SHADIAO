@@ -49,10 +49,10 @@ PAGE_ROUTES = {
     "reminders": "/reminders",
     "main": "/main",
     "home": "/main",
-    "qr": "/main",  # QR is on main page
-    "qr_payment": "/main",
-    "payment": "/main",
-    "scan": "/main",
+    "qr": "/qr",  # Special route - frontend will handle as modal
+    "qr_payment": "/qr",
+    "payment": "/qr",
+    "scan": "/qr",
 }
 
 # ==========================================
@@ -258,8 +258,9 @@ def get_profile_data(ic_number):
         user = db.users.find_one({"_id": ic_number})
         if user:
             # Map preferred_language to voice language code
-            # Supports: ms=Malay, en=English, zh=Chinese, HK=Cantonese/Chinese, ta=Tamil
-            lang_map = {"ms": "BM", "en": "BI", "zh": "BC", "HK": "BC", "hk": "BC", "ta": "BI", "zh-HK": "BC"}
+            # Supports: ms=Malay, en=English, zh=Chinese (Mandarin), HK=Cantonese, ta=Tamil
+            # HK users get Cantonese TTS (browser supports zh-HK)
+            lang_map = {"ms": "BM", "en": "BI", "zh": "BC", "HK": "HK", "hk": "HK", "ta": "BI", "zh-HK": "HK"}
             user_lang = user.get("preferred_language", "ms")
             lang = lang_map.get(user_lang, "BM")
             print(f"   🌐 User {ic_number} preferred_language: {user_lang} -> voice lang: {lang}")
@@ -400,16 +401,21 @@ def run_agent_logic(user_text, user_ic="900101012345"):
             "ask": "Would you like to go to the {page} page?",
             "opening": "Opening {page} page...",
             "cancelled": "Okay, not opening the page.",
+        },
+        "HK": {
+            "ask": "你想去{page}頁面嗎？",
+            "opening": "正在打開{page}頁面...",
+            "cancelled": "好，唔開頁面。",
         }
     }
 
     page_names = {
-        "str": {"BM": "STR", "BC": "STR", "BI": "STR"},
-        "sara": {"BM": "MyKasih", "BC": "MyKasih", "BI": "MyKasih"},
-        "str_apply": {"BM": "Permohonan STR", "BC": "STR申请", "BI": "STR Application"},
-        "reminders": {"BM": "Peringatan", "BC": "提醒", "BI": "Reminders"},
-        "main": {"BM": "Utama", "BC": "主页", "BI": "Home"},
-        "qr": {"BM": "Kod QR", "BC": "二维码", "BI": "QR Code"},
+        "str": {"BM": "STR", "BC": "STR", "BI": "STR", "HK": "STR"},
+        "sara": {"BM": "MyKasih", "BC": "MyKasih", "BI": "MyKasih", "HK": "MyKasih"},
+        "str_apply": {"BM": "Permohonan STR", "BC": "STR申请", "BI": "STR Application", "HK": "STR申請"},
+        "reminders": {"BM": "Peringatan", "BC": "提醒", "BI": "Reminders", "HK": "提醒"},
+        "main": {"BM": "Utama", "BC": "主页", "BI": "Home", "HK": "主頁"},
+        "qr": {"BM": "Kod QR", "BC": "二维码", "BI": "QR Code", "HK": "QR碼"},
     }
 
     prompts = navigation_prompts.get(lang, navigation_prompts["BM"])
@@ -447,15 +453,33 @@ def run_agent_logic(user_text, user_ic="900101012345"):
         
         if action == "initiate_add_rep":
             session_state["step"] = "ASK_IC"
-            return {"reply": "Boleh. Sila berikan nombor Kad Pengenalan anak anda?", "lang": lang, "continue_conversation": True}
+            ic_prompts = {
+                "BM": "Boleh. Sila berikan nombor Kad Pengenalan anak anda?",
+                "BI": "Sure. Please provide your child's IC number?",
+                "BC": "好的。请提供您孩子的身份证号码？",
+                "HK": "好。請畀你仔女嘅身份證號碼？"
+            }
+            return {"reply": ic_prompts.get(lang, ic_prompts["BM"]), "lang": lang, "continue_conversation": True}
         
         elif action == "check_str_status":
             aid_data = get_financial_aid_data(user_ic)
             if aid_data.get("str_eligible"):
                 next_payment = aid_data.get("str_nextPayAmount", 200)
-                reply = f"Permohonan STR anda lulus. Bayaran seterusnya RM{next_payment}."
+                str_success = {
+                    "BM": f"Permohonan STR anda lulus. Bayaran seterusnya RM{next_payment}.",
+                    "BI": f"Your STR application is approved. Next payment is RM{next_payment}.",
+                    "BC": f"您的STR申请已批准。下次付款为RM{next_payment}。",
+                    "HK": f"你嘅STR申請已批准。下次畀錢係RM{next_payment}。"
+                }
+                reply = str_success.get(lang, str_success["BM"])
             else:
-                reply = "Permohonan STR anda masih dalam proses."
+                str_pending = {
+                    "BM": "Permohonan STR anda masih dalam proses.",
+                    "BI": "Your STR application is still being processed.",
+                    "BC": "您的STR申请仍在处理中。",
+                    "HK": "你嘅STR申請仲喺處理緊。"
+                }
+                reply = str_pending.get(lang, str_pending["BM"])
             
             if navigate_to:
                 page_name = page_names.get(navigate_to, {}).get(lang, "STR")
@@ -469,7 +493,13 @@ def run_agent_logic(user_text, user_ic="900101012345"):
         elif action == "check_mykasih_balance":
             aid_data = get_financial_aid_data(user_ic)
             balance = aid_data.get("mykasih_balance_not_expire", 50)
-            reply = f"Baki MyKasih anda tinggal RM{balance}."
+            mykasih_balance = {
+                "BM": f"Baki MyKasih anda tinggal RM{balance}.",
+                "BI": f"Your MyKasih balance is RM{balance}.",
+                "BC": f"您的MyKasih余额为RM{balance}。",
+                "HK": f"你嘅MyKasih餘額係RM{balance}。"
+            }
+            reply = mykasih_balance.get(lang, mykasih_balance["BM"])
             
             if navigate_to:
                 page_name = page_names.get(navigate_to, {}).get(lang, "MyKasih")
@@ -491,22 +521,26 @@ def run_agent_logic(user_text, user_ic="900101012345"):
                     "apply_str": {
                         "BM": "Anda boleh mohon STR di halaman permohonan.",
                         "BI": "You can apply for STR on the application page.",
-                        "BC": "你可以在申请页面申请STR。"
+                        "BC": "你可以在申请页面申请STR。",
+                        "HK": "你可以喺申請頁面申請STR。"
                     },
                     "check_reminders": {
                         "BM": "Anda ada 2 peringatan.",
                         "BI": "You have 2 reminders.",
-                        "BC": "你有2个提醒。"
+                        "BC": "你有2个提醒。",
+                        "HK": "你有2個提醒。"
                     },
                     "open_qr": {
                         "BM": "Saya akan buka kod QR untuk bayaran.",
                         "BI": "I will open the QR code for payment.",
-                        "BC": "我将打开二维码进行支付。"
+                        "BC": "我将打开二维码进行支付。",
+                        "HK": "我會打開QR碼俾你付款。"
                     },
                     "go_home": {
                         "BM": "Baiklah, kembali ke halaman utama.",
                         "BI": "Okay, returning to the main page.",
-                        "BC": "好的，返回主页。"
+                        "BC": "好的，返回主页。",
+                        "HK": "好，返去主頁。"
                     }
                 }
                 
@@ -514,7 +548,13 @@ def run_agent_logic(user_text, user_ic="900101012345"):
                 reply += f" {prompts['ask'].format(page=page_name)}"
                 return {"reply": reply, "lang": lang, "continue_conversation": True}
         
-        return {"reply": "Maaf, saya hanya boleh bantu urusan STR dan MyKasih.", "lang": lang, "continue_conversation": False}
+        unknown_msg = {
+            "BM": "Maaf, saya hanya boleh bantu urusan STR dan MyKasih.",
+            "BI": "Sorry, I can only help with STR and MyKasih matters.",
+            "BC": "抱歉，我只能帮助处理STR和MyKasih事务。",
+            "HK": "對唔住，我只可以幫你處理STR同MyKasih嘅嘢。"
+        }
+        return {"reply": unknown_msg.get(lang, unknown_msg["BM"]), "lang": lang, "continue_conversation": False}
 
     elif step == "ASK_IC":
         ic = decision.get("extracted_ic")
@@ -522,25 +562,61 @@ def run_agent_logic(user_text, user_ic="900101012345"):
             session_state["temp_data"]["ic"] = ic
             session_state["step"] = "CONFIRM_IC_STEP"
             readable_ic = " ".join(ic)
-            return {"reply": f"Saya dengar {readable_ic}. Adakah betul?", "lang": lang, "continue_conversation": True}
+            ic_confirm = {
+                "BM": f"Saya dengar {readable_ic}. Adakah betul?",
+                "BI": f"I heard {readable_ic}. Is that correct?",
+                "BC": f"我听到{readable_ic}。这对吗？",
+                "HK": f"我聽到{readable_ic}。啱唔啱？"
+            }
+            return {"reply": ic_confirm.get(lang, ic_confirm["BM"]), "lang": lang, "continue_conversation": True}
         else:
-            return {"reply": "Maaf, ulang nombor IC sahaja.", "lang": lang, "continue_conversation": True}
+            ic_retry = {
+                "BM": "Maaf, ulang nombor IC sahaja.",
+                "BI": "Sorry, please repeat the IC number only.",
+                "BC": "抱歉，请只重复身份证号码。",
+                "HK": "對唔住，請只係講返個身份證號碼。"
+            }
+            return {"reply": ic_retry.get(lang, ic_retry["BM"]), "lang": lang, "continue_conversation": True}
 
     elif step == "CONFIRM_IC_STEP":
         if decision.get("confirmation"):
             session_state["step"] = "ASK_AMOUNT"
-            return {"reply": "Baik. Berapa limit belanja?", "lang": lang, "continue_conversation": True}
+            ask_limit = {
+                "BM": "Baik. Berapa limit belanja?",
+                "BI": "Okay. What is the spending limit?",
+                "BC": "好的。消费限额是多少？",
+                "HK": "好。消費限額係幾多？"
+            }
+            return {"reply": ask_limit.get(lang, ask_limit["BM"]), "lang": lang, "continue_conversation": True}
         else:
             session_state["step"] = "ASK_IC"
-            return {"reply": "Maaf. Sila sebut nombor sekali lagi.", "lang": lang, "continue_conversation": True}
+            ic_again = {
+                "BM": "Maaf. Sila sebut nombor sekali lagi.",
+                "BI": "Sorry. Please say the number again.",
+                "BC": "抱歉。请再说一次号码。",
+                "HK": "對唔住。請再講多次個號碼。"
+            }
+            return {"reply": ic_again.get(lang, ic_again["BM"]), "lang": lang, "continue_conversation": True}
 
     elif step == "ASK_AMOUNT":
         amt = decision.get("extracted_amount")
         if amt:
             reset_session()
-            return {"reply": f"Selesai. Limit RM{amt} ditetapkan.", "lang": lang, "continue_conversation": False}
+            limit_set = {
+                "BM": f"Selesai. Limit RM{amt} ditetapkan.",
+                "BI": f"Done. Limit of RM{amt} has been set.",
+                "BC": f"完成。已设置RM{amt}的限额。",
+                "HK": f"搞掂。已設定RM{amt}嘅限額。"
+            }
+            return {"reply": limit_set.get(lang, limit_set["BM"]), "lang": lang, "continue_conversation": False}
 
-    return {"reply": "Maaf tak faham.", "lang": lang, "continue_conversation": False}
+    not_understood = {
+        "BM": "Maaf tak faham.",
+        "BI": "Sorry, I didn't understand.",
+        "BC": "抱歉，我不明白。",
+        "HK": "對唔住，我唔明。"
+    }
+    return {"reply": not_understood.get(lang, not_understood["BM"]), "lang": lang, "continue_conversation": False}
 
 def transcribe_audio(audio_data, sample_rate=SAMPLE_RATE):
     """Transcribe audio using Malaysian Whisper model"""

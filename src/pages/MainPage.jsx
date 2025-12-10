@@ -45,7 +45,14 @@ const MainPage = () => {
   } = useVoiceNavigation(getStoredIc(), (route) => {
     // Navigate to the route returned by voice AI
     console.log('🚀 Voice navigation to:', route);
-    navigate(route);
+    
+    // Special handling for QR - open modal instead of navigating
+    if (route === '/qr') {
+      console.log('📱 Opening QR modal...');
+      setIsQRModalOpen(true);
+    } else {
+      navigate(route);
+    }
   });
 
   const synthRef = useRef(window.speechSynthesis);
@@ -73,12 +80,15 @@ const MainPage = () => {
 
       // Load Requests
       const loadRequests = () => {
-        const allRequests = JSON.parse(localStorage.getItem('family_requests') || '[]');
+        // Read once per tick and avoid repeated parsing inside tight loop
+        const raw = localStorage.getItem('family_requests');
+        const allRequests = raw ? JSON.parse(raw) : [];
         const myRequests = allRequests.filter(req => req.toIc === user.icNumber && req.status === 'pending');
         setRequests(myRequests);
       };
       loadRequests();
-      const interval = setInterval(loadRequests, 2000);
+      // Poll less frequently to reduce CPU and JSON parsing on page load
+      const interval = setInterval(loadRequests, 10000);
 
       // Load Reminders
       const mkData = myKasihData[user.icNumber];
@@ -301,6 +311,26 @@ const MainPage = () => {
           {aiResponse && (
             <div style={{ alignSelf: 'flex-start', backgroundColor: '#f3f4f6', padding: '15px', borderRadius: '15px 15px 15px 0', maxWidth: '80%', border: '1px solid #e5e7eb' }}>
               <p style={{ margin: 0, color: '#374151' }}>{aiResponse}</p>
+            </div>
+          )}
+
+          {/* Voice Assistant Typing Indicator */}
+          {isProcessing && (
+            <div style={{ alignSelf: 'flex-start', backgroundColor: '#f3f4f6', padding: '15px', borderRadius: '15px 15px 15px 0', maxWidth: '80%', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ color: '#374151', fontStyle: 'italic' }}>Voice assistant is typing</span>
+              <span className="typing-indicator" style={{ display: 'inline-block', width: '24px', height: '24px' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="5" cy="12" r="2" fill="#9ca3af">
+                    <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite"/>
+                  </circle>
+                  <circle cx="12" cy="12" r="2" fill="#9ca3af">
+                    <animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite"/>
+                  </circle>
+                  <circle cx="19" cy="12" r="2" fill="#9ca3af">
+                    <animate attributeName="opacity" values="1;0.3;1" dur="1s" begin="0.5s" repeatCount="indefinite"/>
+                  </circle>
+                </svg>
+              </span>
             </div>
           )}
         </main>
