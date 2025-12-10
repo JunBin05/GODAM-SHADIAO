@@ -44,6 +44,39 @@ async def health_check():
 
 
 
+# Full user profile endpoint for forms (returns all fields including family)
+@app.get("/api/auth/user/{ic}")
+async def get_full_user_profile(ic: str):
+    """Get complete user profile for form pre-filling including family data"""
+    from services.mongodb_service import get_user_by_id
+    
+    try:
+        user = get_user_by_id(ic)
+        
+        if user:
+            # Return full user data for form pre-filling
+            return {
+                "success": True,
+                "data": {
+                    "ic": ic,
+                    "name": user.get('name', ''),
+                    "preferred_language": user.get('preferred_language', 'en'),
+                    "monthly_income": user.get('monthly_income'),
+                    "marital_status": user.get('marital_status', 'single'),
+                    "state": user.get('state', ''),
+                    "spouse": user.get('spouse'),
+                    "children": user.get('children', []),
+                    "guardian": user.get('guardian'),
+                    "hasVoice": bool(user.get('voiceEmbedding')),
+                    "hasFace": bool(user.get('face_embedding'))
+                }
+            }
+    except Exception as e:
+        print(f"Error loading user profile: {e}")
+        return {"success": False, "detail": str(e)}
+    
+    return {"success": False, "detail": "User not found"}
+
 
 
 # Financial Aid Eligibility endpoint - fetches from Firebase financialAid collection
@@ -123,6 +156,129 @@ app.include_router(user.router, prefix="/api/user", tags=["User Management"])
 #     print("✓ Voice login routes loaded successfully")
 # except Exception as e:
 #     print(f"⚠ Voice login routes not available: {e}")
+
+# Mount voice navigation API
+try:
+    from fastapi import UploadFile, File, Form
+    import sys
+    import os
+    voice_path = os.path.join(os.path.dirname(__file__), "..", "voice-login")
+    sys.path.insert(0, voice_path)
+    
+    # Import voice navigation module (no auto-load)
+    from voice_navigation_module import (
+        load_whisper_model,
+        transcribe_audio,
+        run_agent_logic,
+        session_state,
+        reset_session,
+        SAMPLE_RATE
+    )
+    
+    # Load Whisper model at startup
+    print("\n" + "🔊 "*30)
+    print("STARTING VOICE NAVIGATION MODULE")
+    print("🔊 "*30 + "\n")
+    
+    model_loaded = load_whisper_model()
+    
+    if model_loaded:
+        @app.post("/voice/process")
+        async def process_voice_navigation(
+            audio: UploadFile = File(...),
+            user_ic: str = Form(default="900101012345")
+        ):
+            """Process voice audio for navigation"""
+            import numpy as np
+            import soundfile as sf
+            import io
+            
+            try:
+                # Read audio
+                audio_bytes = await audio.read()
+                audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
+                
+                # Convert to mono
+                if len(audio_data.shape) > 1:
+                    audio_data = audio_data.mean(axis=1)
+                
+                # Resample if needed
+                if sample_rate != SAMPLE_RATE:
+                    import librosa
+                    audio_data = librosa.resample(audio_data, orig_sr=sample_rate, target_sr=SAMPLE_RATE)
+                
+                audio_data = audio_data.astype(np.float32)
+                
+                # Transcribe
+                print(f"🎙️ Transcribing audio for IC: {user_ic}")
+                transcript = transcribe_audio(audio_data)
+                print(f"   Transcript: {transcript}")
+                
+                # Get AI response
+                result = run_agent_logic(transcript, user_ic)
+                result["transcript"] = transcript
+                result["session_state"] = session_state.copy()
+                # Note: navigate_to is only returned by run_agent_logic when user confirms
+                
+                print(f"   AI Reply: {result['reply']}")
+                return result
+            except Exception as e:
+                print(f"❌ Voice processing error: {e}")
+                import traceback
+                traceback.print_exc()
+                from fastapi import HTTPException
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @app.post("/voice/reset")
+        async def reset_voice_navigation():
+            """Reset voice navigation session"""
+            reset_session()
+            return {"status": "Session reset", "session_state": session_state}
+        
+        @app.post("/voice/transcribe")
+        async def transcribe_voice(audio: UploadFile = File(...)):
+            """Simple transcription endpoint for form filling"""
+            import numpy as np
+            import soundfile as sf
+            import io
+            
+            try:
+                audio_bytes = await audio.read()
+                audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
+                
+                if len(audio_data.shape) > 1:
+                    audio_data = audio_data.mean(axis=1)
+                
+                if sample_rate != SAMPLE_RATE:
+                    import librosa
+                    audio_data = librosa.resample(audio_data, orig_sr=sample_rate, target_sr=SAMPLE_RATE)
+                
+                audio_data = audio_data.astype(np.float32)
+                
+                print(f"🎙️ Transcribing audio for form...")
+                transcript = transcribe_audio(audio_data)
+                print(f"   Transcript: {transcript}")
+                
+                return {"success": True, "transcription": transcript}
+            except Exception as e:
+                print(f"❌ Transcription error: {e}")
+                return {"success": False, "error": str(e)}
+        
+        print("\n" + "✅ "*30)
+        print("VOICE NAVIGATION: FULLY OPERATIONAL")
+        print("✅ "*30)
+        print("• Endpoints: /voice/process, /voice/reset")
+        print("• Malaysian Whisper Model: LOADED")
+        print("• Supported: Malay, English, Chinese")
+        print("• Recognition: STR, MyKasih, SARA optimized")
+        print("="*70 + "\n")
+    else:
+        print("\n⚠️  Voice navigation running in fallback mode (model load failed)\n")
+    
+except Exception as e:
+    print(f"⚠ Voice navigation API not loaded: {e}")
+    import traceback
+    traceback.print_exc()
 
 if __name__ == "__main__":
     import uvicorn

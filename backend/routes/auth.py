@@ -150,3 +150,55 @@ async def register(request: RegisterRequest):
             "enrolled_programs": new_user['enrolled_programs']
         }
     }
+
+
+@router.get("/user/{ic}")
+async def get_user_profile(ic: str):
+    """
+    Get user profile by IC number
+    Returns user data for pre-filling forms
+    """
+    from services.mongodb_service import get_user_by_ic, get_financial_aid
+    
+    user = get_user_by_ic(ic)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "success": False,
+                "error": "User not found",
+                "code": "USER_NOT_FOUND"
+            }
+        )
+    
+    # Get financial aid data too
+    financial_aid = get_financial_aid(ic) or {}
+    
+    return {
+        "success": True,
+        "data": {
+            "ic": ic,
+            "name": user.get("name", ""),
+            "phone": user.get("phone", ""),
+            "email": user.get("email", ""),
+            "state": user.get("state", ""),
+            "monthly_income": user.get("monthly_income", 0),
+            "employment_status": user.get("employment_status", ""),
+            "dependents": user.get("dependents", 0),
+            "household_size": user.get("household_size", 1),
+            "preferred_language": user.get("preferred_language", "ms"),
+            "disability_status": user.get("disability_status", False),
+            "enrolled_programs": user.get("enrolled_programs", []),
+            # Family fields for STR application
+            "marital_status": user.get("marital_status", ""),
+            "spouse": user.get("spouse", {}),
+            "children": user.get("children", []),
+            "guardian": user.get("guardian", {}),
+            "financial_aid": {
+                "str_eligible": financial_aid.get("str_eligible", False),
+                "str_nextPayAmount": financial_aid.get("str_nextPayAmount", 0),
+                "mykasih_balance_not_expire": financial_aid.get("mykasih_balance_not_expire", 0),
+                "mykasih_eligible": financial_aid.get("mykasih_eligible", False)
+            }
+        }
+    }
