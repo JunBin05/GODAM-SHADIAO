@@ -175,7 +175,7 @@ export const useVoiceRecorder = () => {
     try {
       // First recording
       let formData = new FormData();
-      formData.append('user_id', userId);
+      formData.append('nric', userId);
       formData.append('voice_1', audioBlob1, 'voice_registration_1.wav');
       formData.append('voice_2', audioBlob2, 'voice_registration_2.wav');
       let response = await fetch(`${API_BASE_URL}/user/update_voice`, {
@@ -357,11 +357,11 @@ export const useVoiceRecorder = () => {
 
       // Create form data
       const formData = new FormData();
-      formData.append('user_id', userId);
-      formData.append('audio', wavBlob, 'voice_verification.wav');
+      formData.append('nric', userId);
+      formData.append('voice', wavBlob, 'voice_verification.wav');
 
       // Send to backend
-      const response = await fetch(`${API_BASE_URL}/voice/login`, {
+      const response = await fetch(`${API_BASE_URL}/user/login_voice`, {
         method: 'POST',
         body: formData,
       });
@@ -371,13 +371,20 @@ export const useVoiceRecorder = () => {
       setIsProcessing(false);
 
       if (response.ok) {
-        return {
-          success: true,
-          authenticated: result.authenticated,
-          similarity: result.similarity_score,
-          threshold: result.threshold,
-          message: result.message
-        };
+        if (result.verified) {
+          const userData = result.userData;
+          return {
+            success: true,
+            authenticated: true,
+            userData: userData
+          };
+        } else {
+          return {
+            success: true,
+            authenticated: false,
+            message: result.message
+          }
+        }
       } else {
         throw new Error(result.detail || 'Verification failed');
       }

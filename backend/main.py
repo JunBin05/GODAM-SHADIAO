@@ -163,8 +163,8 @@ async def update_user_language(request: dict):
 
 # Temporarily disabled facial recognition due to Python 3.13 incompatibility with numpy<2.0
 # TODO: Install Visual Studio Build Tools or downgrade to Python 3.11 to enable facial recognition
-# from routes import user
-# app.include_router(user.router, prefix="/api/user", tags=["User Management"])
+from routes import user
+app.include_router(user.router, prefix="/api/user", tags=["User Management"])
 
 # TODO: Update these services to use MongoDB
 # try:
@@ -180,27 +180,27 @@ async def update_user_language(request: dict):
 #     print(f"⚠ Additional routes not loaded: {e}")
 
 # Mount voice login routes from load_VoiceLogin_Model
-try:
-    from load_VoiceLogin_Model import app as voice_app
-    # Import the routes directly instead of mounting
-    from load_VoiceLogin_Model import (
-        health_check as voice_health,
-        register_user_data,
-        register_voice,
-        start_registration,
-        confirm_registration,
-        cancel_registration,
-        login_voice
-    )
-    # Add voice routes to main app (with /api prefix to match frontend)
-    app.post("/api/voice/register")(register_voice)
-    app.post("/api/voice/register/start")(start_registration)
-    app.post("/api/voice/register/confirm")(confirm_registration)
-    app.delete("/api/voice/register/cancel/{user_id}")(cancel_registration)
-    app.post("/api/voice/login")(login_voice)
-    print("✓ Voice login routes loaded successfully")
-except Exception as e:
-    print(f"⚠ Voice login routes not available: {e}")
+# try:
+#     from load_VoiceLogin_Model import app as voice_app
+#     # Import the routes directly instead of mounting
+#     from load_VoiceLogin_Model import (
+#         health_check as voice_health,
+#         register_user_data,
+#         register_voice,
+#         start_registration,
+#         confirm_registration,
+#         cancel_registration,
+#         login_voice
+#     )
+#     # Add voice routes to main app (with /api prefix to match frontend)
+#     app.post("/api/voice/register")(register_voice)
+#     app.post("/api/voice/register/start")(start_registration)
+#     app.post("/api/voice/register/confirm")(confirm_registration)
+#     app.delete("/api/voice/register/cancel/{user_id}")(cancel_registration)
+#     app.post("/api/voice/login")(login_voice)
+#     print("✓ Voice login routes loaded successfully")
+# except Exception as e:
+#     print(f"⚠ Voice login routes not available: {e}")
 
 # Mount voice navigation API
 try:

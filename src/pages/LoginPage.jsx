@@ -78,6 +78,7 @@ const LoginPage = () => {
       if (response.ok && result.user_exists) {
         setUserData({
           icNumber: icInput,
+          name: result.name,
           hasVoice: result.hasVoice,
           hasFace: result.hasFace
         });
@@ -178,14 +179,14 @@ const LoginPage = () => {
       
       if (result.authenticated) {
         // Save user data to localStorage for other pages
-        localStorage.setItem('registeredUser', JSON.stringify(userData));
+        localStorage.setItem('registeredUser', JSON.stringify(result.userData));
         
         // Short delay to show success message
         setTimeout(() => {
           setStep('success');
         }, 1500);
       } else {
-        setVoiceVerificationError(`Voice does not match. Similarity: ${(result.similarity * 100).toFixed(1)}% (need ${(result.threshold * 100).toFixed(0)}%)`);
+        setVoiceVerificationError(`Voice does not match`);
       }
     } else {
       setVoiceVerificationError(result.message);
@@ -391,7 +392,7 @@ const LoginPage = () => {
           gap: '10px'
         }}>
           <CheckCircle size={24} />
-          <span>Voice verified! Similarity: {(voiceVerificationResult.similarity * 100).toFixed(1)}%</span>
+          <span>Voice verified!</span>
         </div>
       )}
       
