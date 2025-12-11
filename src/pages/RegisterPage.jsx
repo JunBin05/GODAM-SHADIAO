@@ -119,9 +119,62 @@ const processImage = (imageSource) => {
           }
         }
 
-        // --- 5. WRITE BACK TO CANVAS ---
+        // --- 5. GAUSSIAN BLUR (5x5 Kernel) ---
+        // Python: cv2.GaussianBlur(thresh, (5, 5), 0)
+        // Apply Gaussian blur to smooth the image
+
+        const kernelSize = 5;
+        const radius = Math.floor(kernelSize / 2);
+
+        // Generate Gaussian kernel (5x5 with sigma auto-calculated)
+        const sigma = 0.3 * ((kernelSize - 1) * 0.5 - 1) + 0.8; // OpenCV's default sigma calculation
+        const kernel = new Float32Array(kernelSize * kernelSize);
+        let kernelSum = 0;
+
+        for (let ky = 0; ky < kernelSize; ky++) {
+          for (let kx = 0; kx < kernelSize; kx++) {
+            const x = kx - radius;
+            const y = ky - radius;
+            const value = Math.exp(-(x * x + y * y) / (2 * sigma * sigma));
+            kernel[ky * kernelSize + kx] = value;
+            kernelSum += value;
+          }
+        }
+
+        // Normalize kernel
+        for (let i = 0; i < kernel.length; i++) {
+          kernel[i] /= kernelSum;
+        }
+
+        // Apply Gaussian blur
+        let blurred = new Uint8Array(w * h);
+        for (let y = radius; y < h - radius; y++) {
+          for (let x = radius; x < w - radius; x++) {
+            let sum = 0;
+            for (let ky = 0; ky < kernelSize; ky++) {
+              for (let kx = 0; kx < kernelSize; kx++) {
+                const pixelX = x + kx - radius;
+                const pixelY = y + ky - radius;
+                const pixelIndex = pixelY * w + pixelX;
+                sum += eroded[pixelIndex] * kernel[ky * kernelSize + kx];
+              }
+            }
+            blurred[y * w + x] = Math.round(sum);
+          }
+        }
+
+        // Copy edges from eroded image
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (y < radius || y >= h - radius || x < radius || x >= w - radius) {
+              blurred[y * w + x] = eroded[y * w + x];
+            }
+          }
+        }
+
+        // --- 6. WRITE BACK TO CANVAS ---
         for (let i = 0; i < w * h; i++) {
-          const val = eroded[i];
+          const val = blurred[i];
           data[i * 4] = val;     // R
           data[i * 4 + 1] = val; // G
           data[i * 4 + 2] = val; // B
@@ -206,7 +259,7 @@ const RegisterPage = () => {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
 
-          const targetHeight = 480;
+          const targetHeight = 600;
           const containerAspectRatio = containerSize.width / containerSize.height;
           const targetWidth = targetHeight * containerAspectRatio;
 
@@ -244,7 +297,7 @@ const RegisterPage = () => {
     const processedImageBlob = await processImage(imageSrc);
 
     // show processed image for debugging
-    // console.log(processedImageBlob);
+    console.log(processedImageBlob);
     // show it as an image
 
 
@@ -288,46 +341,62 @@ const RegisterPage = () => {
 
 
     await worker2.setParameters({
-      tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+      tessedit_pageseg_mode: Tesseract.PSM.PSM_SINGLE_BLOCK,
     });
 
 
     const { data: data2 } = await worker2.recognize(processedImageBlob, {}, { blocks: true, paragraphs: true, lines: true, words: true });
     await worker2.terminate();
 
+    console.log("OCR Blocks:", data2);
 
-    const midPointY = 240;
+    const midPointY = 300;
     let targetLineY = 999999;
     let foundLine = false;
 
     // Find the target Y coordinate (Top-most line in bottom half)
     data2.blocks.forEach(block => {
-      const { y0 } = block.bbox;
-      const confidence = block.confidence;
+      block.paragraphs.forEach(paragraph => {
+        paragraph.lines.forEach(line => {
+          line.words.forEach(word => {
+            const { y0 } = word.bbox;
+            const confidence = word.confidence;
 
-      // Condition: High confidence AND in bottom half
-      if (confidence > 60 && y0 > midPointY) {
-        // We look for the smallest Y (highest visual position) in this region
-        if (y0 < targetLineY) {
-          targetLineY = y0;
-          foundLine = true;
-        }
-      }
+            // Condition: High confidence AND in bottom half
+            if (confidence > 50 && y0 > midPointY) {
+              // We look for the smallest Y (highest visual position) in this region
+              if (y0 < targetLineY) {
+                targetLineY = y0;
+                foundLine = true;
+              }
+            }
+          });
+        });
+      });
     });
 
     // Collect text on that line
     let extractedName = "";
     if (foundLine) {
-      data2.blocks.forEach(block => {
-        const { y0 } = block.bbox;
-        const confidence = block.confidence;
 
-        // Tolerance of +/- 10 pixels for being on the "same line"
-        if (confidence > 60 && y0 >= targetLineY - 10 && y0 <= targetLineY + 10) {
-          extractedName += block.text + " ";
-        }
+      data2.blocks.forEach(block => {
+      block.paragraphs.forEach(paragraph => {
+        paragraph.lines.forEach(line => {
+          line.words.forEach(word => {
+            const { y0 } = word.bbox;
+            const confidence = word.confidence;
+
+            // Tolerance of +/- 10 pixels for being on the "same line"
+            if (confidence > 50 && y0 >= targetLineY - 10 && y0 <= targetLineY + 10) {
+              extractedName += word.text + " ";
+            }
+          });
+        });
       });
+    });
     }
+
+
 
     // Fallback if OCR fails
     const finalName = extractedName.trim() || "(Rescan Required)";
@@ -439,7 +508,7 @@ const RegisterPage = () => {
       const firstRecordingResponse = await fetch(firstRecordingUrl);
       const firstRecordingBlob = await firstRecordingResponse.blob();
       const result = await voiceRegistration(userId, firstRecordingBlob, audioBlob2);
-      
+
       console.log('Voice registration result:', result);
 
       if (result.success) {
@@ -749,7 +818,7 @@ const RegisterPage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: icData.icNumber,
+          nric: icData.icNumber,
           language: selectedLanguage,
         }),
       });

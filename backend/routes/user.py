@@ -28,7 +28,7 @@ class UserVerifyRequest(BaseModel):
     face_image_url: str
 
 class SetLanguageRequest(BaseModel):
-    user_id: str
+    nric: str
     language: str
 
 class UserExistsRequest(BaseModel):
@@ -81,17 +81,18 @@ async def user_exists(user_data: UserExistsRequest):
     from services.mongodb_service import get_user_by_id
     nric = user_data.nric.replace("-", "")
     user = get_user_by_id(nric)
+    name = user.get('name', '') if user else ''
     hasFace = user is not None and 'face_embedding' in user and user['face_embedding'] is not None
     hasVoice = user is not None and 'voice_embedding' in user and user['voice_embedding'] is not None
     if user:
         return JSONResponse(
             status_code=200,
-            content={"status": "success", "message": "User with the given NRIC already exists.", "user_exists": True, "hasFace": hasFace, "hasVoice": hasVoice}
+            content={"status": "success", "message": "User with the given NRIC already exists.", "user_exists": True, "name": name, "hasFace": hasFace, "hasVoice": hasVoice}
         )
     else:
         return JSONResponse(
             status_code=200,
-            content={"status": "fail", "message": "User with the given NRIC does not exist.", "user_exists": False, "hasFace": False, "hasVoice": False}
+            content={"status": "fail", "message": "User with the given NRIC does not exist.", "user_exists": False, "name": '', "hasFace": False, "hasVoice": False}
         )
 
 # Simple user registration endpoint for frontend
@@ -200,14 +201,14 @@ async def register_user(user_data: UserRegisterRequest):
 
 @router.post("/update_voice")
 async def update_voice_embedding(
-    user_id: str = Form(...),
+    nric: str = Form(...),
     voice_1: UploadFile = File(...),
     voice_2: UploadFile = File(...)
 
 ):
     from services.mongodb_service import user_exists, update_user
-    user_id = user_id.replace("-", "")
-    if not user_exists(user_id):
+    nric = nric.replace("-", "")
+    if not user_exists(nric):
         return JSONResponse(
             status_code=404,
             content={"status": "error", "message": "User with the given NRIC does not exist."}
@@ -236,7 +237,7 @@ async def update_voice_embedding(
 
     if VoiceRecognition.similar_for_confirmation(emb1, emb2):
         averaged_embedding = VoiceRecognition.average_embeddings(emb1, emb2)
-        update_user(user_id, {"voice_embedding": averaged_embedding.tolist()})
+        update_user(nric, {"voice_embedding": averaged_embedding.tolist()})
         return JSONResponse(
             status_code=200,
             content={"status": "success", "message": "Voice embeddings updated successfully."}
@@ -250,16 +251,16 @@ async def update_voice_embedding(
 @router.post("/set_language")
 async def set_preferred_language(request: SetLanguageRequest):
     from services.mongodb_service import user_exists, update_user
-    user_id = request.user_id.replace("-", "")
+    nric = request.nric.replace("-", "")
     language = request.language
 
-    if not user_exists(user_id):
+    if not user_exists(nric):
         return JSONResponse(
             status_code=404,
             content={"status": "error", "message": "User with the given NRIC does not exist."}
         )
 
-    update_user(user_id, {"preferred_language": language})
+    update_user(nric, {"preferred_language": language})
     return JSONResponse(
         status_code=200,
         content={"status": "success", "message": "Preferred language updated successfully."}
@@ -313,3 +314,56 @@ async def login_face(request: LoginFaceRequest):
             status_code=200,
             content={"status": "fail", "message": "Face authentication failed.", "verified": False, "userData": None}
         )
+
+@router.post("/login_voice")
+async def login_voice(
+    nric: str = Form(...),
+    voice: UploadFile = File(...),
+):
+    from services.mongodb_service import user_exists, get_user_by_id
+    nric = nric.replace("-", "")
+    if not user_exists(nric):
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "message": "User with the given NRIC does not exist."}
+        )
+    user = get_user_by_id(nric)
+    if not user or 'voice_embedding' not in user or user['voice_embedding'] is None:
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "message": "User with the given NRIC has no voice data."}
+        )
+    emb_stored = np.array(user['voice_embedding'], dtype=np.float32)
+
+    # Read uploaded audio bytes
+    audio_bytes = await voice.read()
+    audio = BytesIO(audio_bytes)
+    emb = VoiceRecognition.extract_voice_embedding(audio)
+    if emb is None:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": "Could not extract voice embedding from the provided audio file."}
+        )
+    similar = VoiceRecognition.is_similar(emb_stored, emb)
+    userData = {
+        "icNumber": nric,
+        "name": user.get('name', ''),
+        "language": user.get('preferred_language', 'en'),
+        "hasVoice": True,
+        "hasFace": bool(user.get('face_embedding')),
+        "phone": user.get('phone', ''),
+        "email": user.get('email', ''),
+        "disability_status": user.get('disability_status', False),
+        "state": user.get('state', ''),
+    }
+    if similar:
+        return JSONResponse(
+            status_code=200,
+            content={"status": "success", "message": "Voice authentication successful.", "verified": True, "userData": userData}
+        )
+    else:
+        return JSONResponse(
+            status_code=200,
+            content={"status": "fail", "message": "Voice authentication failed.", "verified": False, "userData": None}
+        )
+
